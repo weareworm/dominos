@@ -51,6 +51,9 @@ mesh = ExtResource("3_5mt32")
 [node name="Dot6" type="MeshInstance3D" parent="TopDots"]
 mesh = ExtResource("3_5mt32")
 
+[node name="Dot7" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
 [node name="BottomDots" type="Node3D" parent="."]
 transform = Transform3D(-1, 1.50996e-07, 0, 6.60024e-15, 4.37114e-08, -1, -1.50996e-07, -1, -4.37114e-08, -8.24623e-10, 0.0262489, -0.0874993)
 script = ExtResource("2_baeww")
@@ -71,6 +74,9 @@ mesh = ExtResource("3_5mt32")
 mesh = ExtResource("3_5mt32")
 
 [node name="Dot6" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot7" type="MeshInstance3D" parent="BottomDots"]
 mesh = ExtResource("3_5mt32")
 
 [node name="HighlightMesh" type="MeshInstance3D" parent="."]
