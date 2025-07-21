@@ -1,0 +1,62 @@
+[gd_scene load_steps=4 format=3 uid="uid://c4yl2i4mtvmod"]
+
+[ext_resource type="Script" uid="uid://b1g2ikbehyjn7" path="res://scripts/score_display.gd" id="1_rijmb"]
+[ext_resource type="Script" uid="uid://dmlbvbxrsidap" path="res://UI/pass_button.gd" id="2_wuyrx"]
+
+[sub_resource type="FontFile" id="FontFile_wuyrx"]
+cache/0/16/0/ascent = 0.0
+cache/0/16/0/descent = 0.0
+cache/0/16/0/underline_position = 0.0
+cache/0/16/0/underline_thickness = 0.0
+cache/0/16/0/scale = 1.0
+cache/0/32/0/ascent = 0.0
+cache/0/32/0/descent = 0.0
+cache/0/32/0/underline_position = 0.0
+cache/0/32/0/underline_thickness = 0.0
+cache/0/32/0/scale = 1.0
+
+[node name="CanvasLayer" type="CanvasLayer"]
+script = ExtResource("1_rijmb")
+
+[node name="PlayerScoreLabel" type="Label" parent="."]
+offset_left = 200.0
+offset_top = 50.0
+offset_right = 240.0
+offset_bottom = 73.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = SubResource("FontFile_wuyrx")
+theme_override_font_sizes/font_size = 32
+
+[node name="Control" type="Control" parent="PlayerScoreLabel"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="AIScoreLabel" type="Label" parent="."]
+offset_left = 400.0
+offset_top = 50.0
+offset_right = 440.0
+offset_bottom = 73.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_fonts/font = SubResource("FontFile_wuyrx")
+theme_override_font_sizes/font_size = 32
+
+[node name="Control" type="Control" parent="AIScoreLabel"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="PassButton" type="Button" parent="."]
+visible = false
+offset_left = 607.0
+offset_top = 1014.0
+offset_right = 691.0
+offset_bottom = 1045.0
+text = "Pass Turn"
+script = ExtResource("2_wuyrx")
+
+[connection signal="pressed" from="PassButton" to="." method="_on_pass_button_pressed"]

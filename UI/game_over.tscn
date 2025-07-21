@@ -1,0 +1,23 @@
+[gd_scene load_steps=2 format=3 uid="uid://c4yda7mv1qr0s"]
+
+[ext_resource type="Script" uid="uid://b022lm5i431wy" path="res://UI/game_over.gd" id="1_jawqf"]
+
+[node name="GameOver" type="CanvasLayer"]
+script = ExtResource("1_jawqf")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
+color = Color(0, 0, 0, 0.658824)
+
+[node name="Label" type="Label" parent="ColorRect"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "Player Wins!"
+
+[node name="Button" type="Button" parent="ColorRect/Label"]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+text = "Play Again"
