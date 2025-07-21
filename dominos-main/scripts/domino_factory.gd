@@ -5,8 +5,8 @@ class_name DominoFactory
 const DOMINO_SCENE = preload("res://scenes/domino.tscn")
 
 func create_random_domino() -> Node:
-	var top_value = randi() % 7  # Values 0-6
-	var bottom_value = randi() % 7
+	var top_value = randi() % 6  # Values 0-6
+	var bottom_value = randi() % 6
 	return create_specific_domino(top_value, bottom_value)
 
 func create_specific_domino(top: int, bottom: int) -> Node:

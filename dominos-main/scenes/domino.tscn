@@ -1,0 +1,78 @@
+[gd_scene load_steps=8 format=3 uid="uid://c2t0y2eaw453r"]
+
+[ext_resource type="Script" uid="uid://b1p8561rf3nq5" path="res://scripts/domino.gd" id="1_5101h"]
+[ext_resource type="Script" uid="uid://bvuq5kbt2al3" path="res://scripts/domino_dots.gd" id="2_baeww"]
+[ext_resource type="SphereMesh" uid="uid://cwh6qsnsgow7s" path="res://meshes/dot_mesh.tres" id="3_5mt32"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2jpam"]
+size = Vector3(0.15, 0.3, 0.05)
+
+[sub_resource type="BoxMesh" id="BoxMesh_b7val"]
+size = Vector3(0.15, 0.3, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qyrqp"]
+metallic = 0.1
+roughness = 0.7
+
+[sub_resource type="BoxMesh" id="BoxMesh_5101h"]
+size = Vector3(0.07, 0.33, 0.001)
+
+[node name="domino" type="RigidBody3D"]
+script = ExtResource("1_5101h")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, -1.49012e-09, -0.0174993, -0.0174993)
+shape = SubResource("BoxShape3D_2jpam")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, -1.49012e-09, -0.0174993, -0.0174993)
+mesh = SubResource("BoxMesh_b7val")
+surface_material_override/0 = SubResource("StandardMaterial3D_qyrqp")
+
+[node name="TopDots" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, -2.15561e-09, 0.0262489, 0.0525007)
+script = ExtResource("2_baeww")
+
+[node name="Dot1" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot2" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot3" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot4" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot5" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot6" type="MeshInstance3D" parent="TopDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="BottomDots" type="Node3D" parent="."]
+transform = Transform3D(-1, 1.50996e-07, 0, 6.60024e-15, 4.37114e-08, -1, -1.50996e-07, -1, -4.37114e-08, -8.24623e-10, 0.0262489, -0.0874993)
+script = ExtResource("2_baeww")
+
+[node name="Dot1" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot2" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot3" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot4" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot5" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="Dot6" type="MeshInstance3D" parent="BottomDots"]
+mesh = ExtResource("3_5mt32")
+
+[node name="HighlightMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, -1.49012e-09, -0.0174993, -0.0174993)
+mesh = SubResource("BoxMesh_5101h")

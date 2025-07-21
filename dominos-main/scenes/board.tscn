@@ -1,0 +1,105 @@
+[gd_scene load_steps=5 format=3 uid="uid://dopf6hlgg0cbj"]
+
+[ext_resource type="Script" uid="uid://cisn2wf7jq3l1" path="res://scripts/board.gd" id="1_p0ybc"]
+[ext_resource type="PackedScene" uid="uid://cluaf3v5swgrd" path="res://scenes/position_marker.tscn" id="2_psm7c"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_p0ybc"]
+size = Vector2(8, 12)
+subdivide_width = 10
+subdivide_depth = 15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_psm7c"]
+albedo_color = Color(0.21242, 0.43, 0.1462, 1)
+
+[node name="board" type="Node3D"]
+script = ExtResource("1_p0ybc")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("PlaneMesh_p0ybc")
+surface_material_override/0 = SubResource("StandardMaterial3D_psm7c")
+
+[node name="Track1" type="Node3D" parent="."]
+
+[node name="Position1" parent="Track1" instance=ExtResource("2_psm7c")]
+
+[node name="Position2" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4)
+
+[node name="Position3" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
+
+[node name="Position4" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.2)
+
+[node name="Position5" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.6)
+
+[node name="Position6" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="Position7" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.4)
+
+[node name="Position8" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.8)
+
+[node name="Position9" parent="Track1" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.2)
+
+[node name="Track2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0)
+
+[node name="Position1" parent="Track2" instance=ExtResource("2_psm7c")]
+
+[node name="Position2" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4)
+
+[node name="Position3" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
+
+[node name="Position4" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.2)
+
+[node name="Position5" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.6)
+
+[node name="Position6" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="Position7" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.4)
+
+[node name="Position8" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.8)
+
+[node name="Position9" parent="Track2" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.2)
+
+[node name="Track3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0)
+
+[node name="Position1" parent="Track3" instance=ExtResource("2_psm7c")]
+
+[node name="Position2" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4)
+
+[node name="Position3" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
+
+[node name="Position4" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.2)
+
+[node name="Position5" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.6)
+
+[node name="Position6" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="Position7" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.4)
+
+[node name="Position8" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.8)
+
+[node name="Position9" parent="Track3" instance=ExtResource("2_psm7c")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.2)
