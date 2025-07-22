@@ -7,6 +7,7 @@ const TRACK_COUNT := 3
 const TRACK_LENGTH := 9
 const HAND_SPACING := 0.5
 const MAX_HAND_SIZE := 5
+const GAME_OVER_SCREEN = preload("res://ui/game_over_screen.tscn")
 
 ### NODE REFERENCES
 var domino_factory: DominoFactory
@@ -22,9 +23,11 @@ var ai_score := 0      # Add this
 @onready var score_ui: CanvasLayer = null
 var ai_hand := []
 var current_turn: String = "player"
-
 var is_discard_mode := false
 var discard_candidate: Domino = null
+var game_winner: String = ""
+var is_game_over := false
+
 
 func _ready():
 	print("Initializing game...")
@@ -196,21 +199,21 @@ func disable_discard_mode():
 		button.disabled = false
 		button.visible = not player_has_valid_moves()
 
-# Replace update_score() with this:
 func update_scores(player_points: int, ai_points: int):
+	if is_game_over:
+		return
+	
 	player_score += player_points
 	ai_score += ai_points
 	
 	if is_instance_valid(score_ui):
-		# Update player score
 		if score_ui.has_node("PlayerScoreLabel"):
-			var player_label = score_ui.get_node("PlayerScoreLabel") as Label
-			player_label.text = "Player: %d" % player_score
-		
-		# Update AI score
+			score_ui.get_node("PlayerScoreLabel").text = "Player: %d" % player_score
 		if score_ui.has_node("AIScoreLabel"):
-			var ai_label = score_ui.get_node("AIScoreLabel") as Label
-			ai_label.text = "AI: %d" % ai_score
+			score_ui.get_node("AIScoreLabel").text = "AI: %d" % ai_score
+	
+	# Check for winner after every score change
+	check_for_winner()
 
 ### TRACK MANAGEMENT
 func _create_track_collision(track: Node3D) -> StaticBody3D:
@@ -358,6 +361,55 @@ func update_turn_indicator():
 		if score_ui.has_node("AITurnIndicator"):
 			var ai_indicator = score_ui.get_node("AITurnIndicator")
 			ai_indicator.visible = true
+
+func check_for_winner():
+	if player_score >= 3:
+		game_winner = "player"
+		is_game_over = true
+	elif ai_score >= 3:
+		game_winner = "ai"
+		is_game_over = true
+	
+	if is_game_over:
+		_handle_game_over()
+		return true
+	return false
+
+func _handle_game_over():
+	print("Game Over! Winner: ", game_winner)
+	set_process_input(false)
+	
+	# Show game over screen
+	var game_over = GAME_OVER_SCREEN.instantiate()
+	add_child(game_over)
+	# Wait one frame to ensure proper initialization
+	await get_tree().process_frame
+	game_over.set_winner(game_winner)
+
+func restart_game():
+	# Clear all dominos
+	for track in tracks:
+		for domino in track.pieces:
+			if is_instance_valid(domino):
+				domino.queue_free()
+		track.pieces.clear()
+	
+	# Reset game state
+	player_hand.clear()
+	ai_hand.clear()
+	domino_pool.clear()
+	game_winner = ""
+	is_game_over = false
+	player_score = 0
+	ai_score = 0
+	
+	# Reinitialize
+	_initialize_game()
+	set_process_input(true)
+	
+	# Hide winner message
+	if score_ui.has_node("WinnerLabel"):
+		score_ui.get_node("WinnerLabel").visible = false
 
 func check_pass_button_state():
 	if score_ui and score_ui.has_node("PassButton"):
