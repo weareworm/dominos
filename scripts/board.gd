@@ -151,18 +151,37 @@ func enable_discard_mode():
 		button.visible = true
 
 func confirm_discard() -> bool:
-	if not discard_candidate: return false
+	if not discard_candidate or not is_instance_valid(discard_candidate):
+		return false
 	
-	# Return to pool and draw new
-	domino_pool.append([discard_candidate.top_value, discard_candidate.bottom_value])
-	if domino_pool.size() > 0:
+	print("Discarding ", discard_candidate.top_value, "-", discard_candidate.bottom_value)
+	
+	# 1. Store values before removal
+	var values = [discard_candidate.top_value, discard_candidate.bottom_value]
+	
+	# 2. Remove from hand and scene
+	player_hand.erase(discard_candidate)
+	remove_child(discard_candidate)
+	discard_candidate.queue_free()
+	
+	# 3. Return to pool and shuffle
+	domino_pool.append(values)
+	domino_pool.shuffle()
+	print("Returned to pool. Pool size: ", domino_pool.size())
+	
+	# 4. Draw replacement if pool isn't empty
+	if domino_pool.size() > 0 and player_hand.size() < MAX_HAND_SIZE:
 		var new_values = domino_pool.pop_back()
 		var new_domino = domino_factory.create_specific_domino(new_values[0], new_values[1])
+		_setup_hand_domino(new_domino, Vector3.ZERO, player_hand.size())
+		add_child(new_domino)
 		player_hand.append(new_domino)
+		_safe_connect_domino_signals(new_domino)
+		print("Drew new domino: ", new_values)
+	else:
+		print("Warning: Couldn't draw replacement")
 	
-	player_hand.erase(discard_candidate)
-	discard_candidate.queue_free()
-	domino_pool.shuffle()
+	reposition_hand()
 	return true
 
 func disable_discard_mode():
