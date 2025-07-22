@@ -316,7 +316,7 @@ func update_turn_indicator():
 			pass_button.visible = true
 			pass_button.disabled = (discard_candidate == null)
 		else:
-			pass_button.text = "Pass Turn"
+			pass_button.text = "Discard Domino"
 
 func check_pass_button_state():
 	if score_ui and score_ui.has_node("PassButton"):
@@ -513,11 +513,11 @@ func try_place_domino(domino: Domino, track_idx: int) -> bool:
 func _clear_and_restart_track(track_idx: int):
 	var track = tracks[track_idx]
 	
-	# Return dominos to pool before clearing
+	# Return ALL dominos to pool (including doubles)
 	for domino in track.pieces:
-		if domino.top_value != domino.bottom_value:  # Don't return doubles
+		if is_instance_valid(domino):
 			domino_pool.append([domino.top_value, domino.bottom_value])
-		domino.queue_free()
+			domino.queue_free()
 	
 	track.pieces.clear()
 	
@@ -529,7 +529,7 @@ func _clear_and_restart_track(track_idx: int):
 	
 	await get_tree().create_timer(0.5).timeout
 	
-	# Shuffle the pool to randomize returned dominos
+	# Shuffle the pool (now including all returned dominos)
 	domino_pool.shuffle()
 	
 	# Create new starting domino

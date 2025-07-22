@@ -52,11 +52,11 @@ offset_bottom = 40.0
 
 [node name="PassButton" type="Button" parent="."]
 visible = false
-offset_left = 607.0
+offset_left = 558.0
 offset_top = 1014.0
-offset_right = 691.0
+offset_right = 642.0
 offset_bottom = 1045.0
-text = "Pass Turn"
+text = "Discard Tile"
 script = ExtResource("2_wuyrx")
 
 [connection signal="pressed" from="PassButton" to="." method="_on_pass_button_pressed"]
