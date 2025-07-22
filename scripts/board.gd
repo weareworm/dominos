@@ -374,16 +374,20 @@ func check_pass_button_state():
 func start_ai_turn():
 	print("AI's turn starting - Current hand size: ", ai_hand.size())
 	
-	# Refill AI hand if empty
-	if ai_hand.is_empty() and domino_pool.size() > 0:
-		refill_ai_hand()
-	
-	# If still no dominos, end turn
-	if ai_hand.is_empty():
-		print("AI has no dominos left")
-		end_ai_turn()
+	# Try normal moves first
+	var valid_moves = _find_ai_valid_moves()
+	if valid_moves.size() > 0:
+		await ai_play_domino(valid_moves[0].values, valid_moves[0].track)
 		return
 	
+	# If no moves, attempt to discard
+	if ai_hand.size() > 0 and domino_pool.size() > 0:
+		await ai_discard_domino()
+	else:
+		print("AI has no moves and cannot discard")
+		end_ai_turn()
+
+func _find_ai_valid_moves() -> Array:
 	var valid_moves = []
 	for domino_values in ai_hand:
 		var domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
@@ -393,14 +397,49 @@ func start_ai_turn():
 					"values": domino_values,
 					"track": track_idx
 				})
-	
-	if valid_moves.size() == 0:
-		print("AI has no valid moves")
+		domino.queue_free()
+	return valid_moves
+
+func ai_discard_domino():
+	if ai_hand.is_empty() or domino_pool.is_empty():
 		end_ai_turn()
 		return
 	
-	var move = valid_moves[randi() % valid_moves.size()]
-	await ai_play_domino(move.values, move.track)
+	print("AI is discarding a domino")
+	
+	# Select a domino to discard (prefer non-doubles)
+	var discard_index = 0
+	for i in range(ai_hand.size()):
+		if ai_hand[i][0] != ai_hand[i][1]:  # Find first non-double
+			discard_index = i
+			break
+	
+	var discarded_values = ai_hand[discard_index]
+	print("AI discarding: ", discarded_values)
+	
+	# Visual feedback
+	var visual_domino = domino_factory.create_specific_domino(discarded_values[0], discarded_values[1])
+	add_child(visual_domino)
+	visual_domino.global_position = Vector3(0, 2, 0)  # Above board
+	visual_domino.set_highlight(true, Color.PURPLE)
+	
+	# Animate the discard
+	var tween = create_tween()
+	tween.tween_property(visual_domino, "position:y", 0, 0.3)
+	await tween.finished
+	
+	# Return to pool and draw new
+	domino_pool.append(discarded_values)
+	ai_hand.remove_at(discard_index)
+	
+	if domino_pool.size() > 0:
+		var new_values = domino_pool.pop_back()
+		ai_hand.append(new_values)
+		print("AI drew new domino: ", new_values)
+	
+	visual_domino.queue_free()
+	domino_pool.shuffle()
+	end_ai_turn()
 
 func ai_play_domino(domino_values: Array, track_idx: int):
 	print("AI playing ", domino_values[0], "-", domino_values[1], " on track ", track_idx+1)
@@ -481,7 +520,8 @@ func end_player_turn():
 	start_ai_turn()
 
 func end_ai_turn():
-	check_pass_button_state()
+	print("AI ending turn - hand size now: ", ai_hand.size())
+	print("Domino pool size: ", domino_pool.size())
 	current_turn = "player"
 	update_turn_indicator()
 
