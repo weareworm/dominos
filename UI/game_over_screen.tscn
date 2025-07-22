@@ -6,21 +6,34 @@
 script = ExtResource("1_50k4i")
 
 [node name="ColorRect" type="ColorRect" parent="."]
-offset_right = 40.0
-offset_bottom = 40.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -680.0
+offset_bottom = -1168.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(18.08, 30.28)
 color = Color(0, 0, 0, 0.392157)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
-offset_left = 350.0
-offset_top = 539.0
-offset_right = 400.0
-offset_bottom = 539.0
+offset_left = 61.0
+offset_top = 340.0
+offset_right = 661.0
+offset_bottom = 840.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+custom_minimum_size = Vector2(600, 300)
 layout_mode = 2
 
 [node name="WinnerLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(100, 100)
 layout_mode = 2
+size_flags_vertical = 1
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="RestartButton" type="Button" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
+text = "Play Again"

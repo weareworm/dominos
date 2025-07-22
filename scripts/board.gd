@@ -376,14 +376,16 @@ func check_for_winner():
 	return false
 
 func _handle_game_over():
-	print("Game Over! Winner: ", game_winner)
 	set_process_input(false)
 	
-	# Show game over screen
+	# Add slight delay to ensure safe instantiation
+	await get_tree().create_timer(0.1).timeout
+	
 	var game_over = GAME_OVER_SCREEN.instantiate()
 	add_child(game_over)
-	# Wait one frame to ensure proper initialization
-	await get_tree().process_frame
+	
+	# Wait until screen is fully ready
+	await game_over.ready
 	game_over.set_winner(game_winner)
 
 func restart_game():

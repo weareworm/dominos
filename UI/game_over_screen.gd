@@ -1,26 +1,22 @@
 extends CanvasLayer
 
-@export var winner_label: Label
-@export var restart_button: Button
+@onready var winner_label: Label = get_node("CenterContainer/VBoxContainer/WinnerLabel")
+@onready var restart_button: Button = get_node("CenterContainer/VBoxContainer/RestartButton")
 
 func _ready():
-	# Wait until next frame to ensure nodes are ready
-	await get_tree().process_frame
-	if not winner_label:
-		winner_label = $VBoxContainer/WinnerLabel
-	if not restart_button:
-		restart_button = $VBoxContainer/RestartButton
+	# Safety check - print node tree if there's issues
+	if not winner_label or not restart_button:
+		print_tree_pretty()
+		push_error("Game Over Screen: Missing required nodes!")
+		return
 	
-	restart_button.pressed.connect(_on_restart_button_pressed)
+	restart_button.pressed.connect(_on_restart_pressed)
 
 func set_winner(winner: String):
 	if winner_label:
 		winner_label.text = "Player Wins!" if winner == "player" else "AI Wins!"
 	else:
-		push_error("Winner label not found!")
+		push_error("WinnerLabel reference is missing!")
 
-func _on_restart_button_pressed():
-	var board = get_parent() as DominoGameBoard
-	if board:
-		board.restart_game()
-	queue_free()
+func _on_restart_pressed():
+	get_tree().reload_current_scene()
