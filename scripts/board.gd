@@ -27,11 +27,32 @@ var is_discard_mode := false
 var discard_candidate: Domino = null
 
 func _ready():
+	print("Initializing game...")
+	initialize_domino_pool()
 	_initialize_game()
 	_initialize_score_ui()
-	update_scores(0,0)
-	current_turn = "player"  # Ensure player starts first
-	update_turn_indicator()  # Add this function (shown below)
+	update_scores(0, 0)
+	current_turn = "player"
+	
+	# Safe signal connection
+	if score_ui:
+		# Clean up existing connections
+		if score_ui.pass_turn_requested.is_connected(_on_pass_turn_requested):
+			score_ui.pass_turn_requested.disconnect(_on_pass_turn_requested)
+		score_ui.pass_turn_requested.connect(_on_pass_turn_requested)
+		
+		# Connect discard signal to handler (not directly to confirm_discard)
+		if score_ui.has_signal("discard_confirmed"):
+			if score_ui.discard_confirmed.is_connected(_on_discard_confirmed):
+				score_ui.discard_confirmed.disconnect(_on_discard_confirmed)
+			score_ui.discard_confirmed.connect(_on_discard_confirmed)
+	
+	update_turn_indicator()
+
+# Add this handler if not already present
+func _on_discard_confirmed():
+	if discard_candidate and confirm_discard():
+		end_player_turn()
 
 ### INITIALIZATION
 func _initialize_game():
@@ -60,10 +81,12 @@ func _setup_camera():
 
 func initialize_domino_pool():
 	domino_pool.clear()
+	# Create all 28 unique domino combinations
 	for i in range(7):
 		for j in range(i, 7):
 			domino_pool.append([i, j])
 	domino_pool.shuffle()
+	print("Initialized pool with ", domino_pool.size(), " dominos")  # Should print 28
 
 func _initialize_tracks():
 	for i in TRACK_COUNT:
@@ -91,72 +114,92 @@ func _initialize_score_ui():
 	await get_tree().process_frame  # Ensure nodes are ready
 	update_scores(0, 0)  # Initialize both scores to 0
 
-	score_ui.pass_turn_requested.connect(_on_pass_turn_requested)
-
 func _on_pass_turn_requested():
-	if current_turn == "player":
-		print("Turn passed via UI")
-		end_player_turn()
+	if current_turn != "player" or player_has_valid_moves():
+		return
+	
+	if is_discard_mode:
+		if discard_candidate:
+			if confirm_discard():
+				disable_discard_mode()
+				end_player_turn()  # Only end turn AFTER successful discard
+		else:
+			print("No domino selected for discard!")
+	else:
+		enable_discard_mode()
 
 func enable_discard_mode():
+	print("Entered discard mode")
 	if player_hand.is_empty():
 		return
 	
 	is_discard_mode = true
 	discard_candidate = null
 	
-	# Highlight all dominos in hand
+	# Highlight all dominos
 	for domino in player_hand:
-		domino.set_highlight(true, Color.YELLOW)
+		if is_instance_valid(domino) and domino.has_method("set_highlight"):
+			domino.set_highlight(true, Color.YELLOW)
 	
-	# Update UI
-	update_turn_indicator()
-	
-	# Show visual feedback
-	if score_ui.has_node("PassButton"):
-		var pass_button = score_ui.get_node("PassButton") as Button
-		pass_button.text = "Confirm Discard"
-		pass_button.disabled = true  # Disabled until domino selected
-
-func disable_discard_mode():
-	is_discard_mode = false
-	
-	# Remove highlights from all dominos
-	for domino in player_hand:
-		if is_instance_valid(domino):
-			domino.set_highlight(false)
-	
-	discard_candidate = null
-	update_turn_indicator()
+	# Update button state
+	if score_ui and score_ui.has_node("PassButton"):
+		var button = score_ui.get_node("PassButton")
+		button.text = "CONFIRM DISCARD"
+		button.disabled = true  # Starts disabled until selection
+		button.visible = true
 
 func confirm_discard() -> bool:
 	if not discard_candidate or not is_instance_valid(discard_candidate):
 		return false
 	
-	# Remove highlight before discarding
-	discard_candidate.set_highlight(false)
+	print("Discarding: ", discard_candidate.top_value, "-", discard_candidate.bottom_value)
+	print("Pool before: ", domino_pool.size())
 	
-	# Return to pool (unless it's a double)
-	if discard_candidate.top_value != discard_candidate.bottom_value:
-		domino_pool.append([discard_candidate.top_value, discard_candidate.bottom_value])
-		domino_pool.shuffle()  # Important to shuffle when returning
+	# Store values before removal
+	var values = [discard_candidate.top_value, discard_candidate.bottom_value]
+	var discard_index = player_hand.find(discard_candidate)
 	
-	# Remove from hand
-	player_hand.erase(discard_candidate)
+	if discard_index == -1:
+		print("ERROR: Domino not found in hand!")
+		return false
+	
+	# Remove from hand and scene
+	player_hand.remove_at(discard_index)
+	remove_child(discard_candidate)
 	discard_candidate.queue_free()
 	
-	# Draw new domino if pool isn't empty
-	if not domino_pool.is_empty():
-		var values = domino_pool.pop_back()
-		var new_domino = domino_factory.create_specific_domino(values[0], values[1])
+	# ALWAYS return to pool (including doubles)
+	domino_pool.append(values)
+	domino_pool.shuffle()
+	print("Returned to pool: ", values)
+	
+	# Draw replacement
+	if domino_pool.size() > 0:
+		var new_values = domino_pool.pop_back()
+		print("Drawing new domino: ", new_values)
+		var new_domino = domino_factory.create_specific_domino(new_values[0], new_values[1])
 		_setup_hand_domino(new_domino, Vector3.ZERO, player_hand.size())
 		add_child(new_domino)
 		player_hand.append(new_domino)
 		_safe_connect_domino_signals(new_domino)
+	else:
+		print("WARNING: Pool empty - cannot draw replacement")
 	
 	reposition_hand()
-	disable_discard_mode()
+	print("Pool after: ", domino_pool.size())
 	return true
+
+func disable_discard_mode():
+	is_discard_mode = false
+	for domino in player_hand:
+		if is_instance_valid(domino):
+			domino.call("set_highlight", false)
+	
+	if score_ui.has_node("PassButton"):
+		var button = score_ui.get_node("PassButton")
+		button.text = "DISCARD DOMINO"
+		button.disabled = false
+		button.visible = not player_has_valid_moves()
 
 # Replace update_score() with this:
 func update_scores(player_points: int, ai_points: int):
@@ -201,18 +244,14 @@ func spawn_starting_dominos():
 		await try_place_domino(domino, i)
 
 func _on_pass_button_pressed():
-	if current_turn != "player":
+	if current_turn != "player" or player_has_valid_moves():
 		return
 	
-	if player_has_valid_moves():
-		return  # Shouldn't be possible since button should be hidden
-	
-	if is_discard_mode and discard_candidate:
-		# Confirm discard and draw new domino
-		if confirm_discard():
-			end_player_turn()
+	if is_discard_mode:
+		if discard_candidate:
+			if confirm_discard():
+				end_player_turn()
 	else:
-		# Enter discard selection mode
 		enable_discard_mode()
 
 func draw_initial_hand():
@@ -297,26 +336,33 @@ func update_turn_indicator():
 	if score_ui.has_node("TurnLabel"):
 		var turn_label = score_ui.get_node("TurnLabel") as Label
 		if is_discard_mode:
-			turn_label.text = "Select Domino to Discard"
+			turn_label.text = "SELECT DOMINO TO DISCARD"
 			turn_label.modulate = Color.GOLD
 		else:
-			turn_label.text = "Your Turn" if current_turn == "player" else "AI Thinking..."
-			turn_label.modulate = Color.GREEN if current_turn == "player" else Color.RED
+			turn_label.text = "YOUR TURN" if current_turn == "player" else "AI THINKING..."
+			turn_label.modulate = Color.LIME_GREEN if current_turn == "player" else Color.RED
 	
-	# Update pass button - only show when no valid moves exist
+	# Update pass/discard button
 	if score_ui.has_node("PassButton"):
 		var pass_button = score_ui.get_node("PassButton") as Button
 		var has_valid_moves = player_has_valid_moves()
 		
-		pass_button.visible = (current_turn == "player" and not has_valid_moves and not is_discard_mode)
-		pass_button.disabled = (current_turn != "player" or has_valid_moves)
+		pass_button.visible = (current_turn == "player" and not has_valid_moves)
 		
 		if is_discard_mode:
-			pass_button.text = "Confirm Discard"
-			pass_button.visible = true
+			pass_button.text = "CONFIRM DISCARD"
 			pass_button.disabled = (discard_candidate == null)
+			pass_button.modulate = Color.WHITE if discard_candidate else Color.GRAY
 		else:
-			pass_button.text = "Discard Domino"
+			pass_button.text = "DISCARD DOMINO"
+			pass_button.disabled = false
+			pass_button.modulate = Color.WHITE
+	
+	# Visual feedback for AI turn
+	if current_turn == "ai":
+		if score_ui.has_node("AITurnIndicator"):
+			var ai_indicator = score_ui.get_node("AITurnIndicator")
+			ai_indicator.visible = true
 
 func check_pass_button_state():
 	if score_ui and score_ui.has_node("PassButton"):
@@ -423,10 +469,15 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 
 
 func end_player_turn():
-	check_pass_button_state()
+	# Only proceed if not in discard mode
+	if is_discard_mode:
+		return
+	
 	current_turn = "ai"
 	update_turn_indicator()
-	await get_tree().create_timer(0.5).timeout  # Small delay before AI moves
+	
+	# Small delay before AI moves
+	await get_tree().create_timer(0.5).timeout
 	start_ai_turn()
 
 func end_ai_turn():
@@ -448,8 +499,10 @@ func can_place_on_track(domino: Domino, track_idx: int) -> bool:
 	var last = track.pieces.back()
 	var visible_end = last.bottom_value if last.display_top else last.top_value
 	
-	if domino.top_value == visible_end || domino.bottom_value == visible_end:
+	# Check if domino matches the end
+	if domino.top_value == visible_end or domino.bottom_value == visible_end:
 		if track.pieces.size() == TRACK_LENGTH - 1:
+			# For last position, check if it completes the loop
 			var first = track.pieces.front()
 			var first_value = first.top_value if first.display_top else first.bottom_value
 			var domino_other_value = domino.bottom_value if domino.top_value == visible_end else domino.top_value
@@ -513,13 +566,15 @@ func try_place_domino(domino: Domino, track_idx: int) -> bool:
 func _clear_and_restart_track(track_idx: int):
 	var track = tracks[track_idx]
 	
-	# Return ALL dominos to pool (including doubles)
+	# Return ALL dominos to pool
 	for domino in track.pieces:
 		if is_instance_valid(domino):
 			domino_pool.append([domino.top_value, domino.bottom_value])
 			domino.queue_free()
 	
 	track.pieces.clear()
+	domino_pool.shuffle()
+	print("Returned track dominos to pool. New pool size: ", domino_pool.size())
 	
 	# Award points
 	if current_turn == "player":
@@ -527,22 +582,16 @@ func _clear_and_restart_track(track_idx: int):
 	else:
 		update_scores(0, 1)
 	
-	await get_tree().create_timer(0.5).timeout
-	
-	# Shuffle the pool (now including all returned dominos)
-	domino_pool.shuffle()
-	
 	# Create new starting domino
-	var new_domino = domino_factory.create_random_domino()
-	if new_domino:
-		new_domino.is_in_hand = false
-		new_domino.place_on_board()
-		add_child(new_domino)
-		new_domino.global_transform = track.positions[0].global_transform
-		new_domino.global_position.y += 0.2
-		new_domino.freeze = true
-		new_domino.display_top = true
-		track.pieces.append(new_domino)
+	if domino_pool.size() > 0:
+		var new_domino = domino_factory.create_random_domino()
+		if new_domino:
+			new_domino.is_in_hand = false
+			new_domino.place_on_board()
+			add_child(new_domino)
+			await try_place_domino(new_domino, track_idx)
+	else:
+		print("ERROR: No dominos left in pool to restart track!")
 
 ### SIGNAL HANDLING
 func _safe_connect_domino_signals(domino: Domino):
@@ -552,31 +601,40 @@ func _safe_connect_domino_signals(domino: Domino):
 	domino.connect("domino_deselected", _on_domino_deselected)
 
 func _on_domino_selected(domino: Domino):
-	if is_processing_selection:
+	print("Selected domino - Discard mode:", is_discard_mode, " Has candidate:", discard_candidate != null)
+	if current_turn != "player" or is_processing_selection:
 		return
-		
+	
 	is_processing_selection = true
 	
 	if is_discard_mode:
-		# Handle discard selection
-		if discard_candidate:
-			discard_candidate.set_highlight(true, Color.YELLOW)  # Reset previous selection
+		# Reset previous selection highlight
+		if discard_candidate and is_instance_valid(discard_candidate):
+			discard_candidate.set_highlight(true, Color.YELLOW)
 		
+		# Set new selection
 		discard_candidate = domino
-		domino.set_highlight(true, Color.ORANGE_RED)  # Highlight as selected
+		domino.set_highlight(true, Color.ORANGE_RED)
 		
-		# Enable confirm button now that we have a selection
-		if score_ui.has_node("PassButton"):
-			var pass_button = score_ui.get_node("PassButton") as Button
-			pass_button.disabled = false
+		# Update button state - THIS IS THE CRITICAL FIX
+		if score_ui and score_ui.has_node("PassButton"):
+			var button = score_ui.get_node("PassButton")
+			button.disabled = false
+			button.text = "CONFIRM DISCARD"
 	else:
-		# Original game selection logic
+		# Normal selection logic
 		if selected_domino and selected_domino != domino:
 			selected_domino.deselect()
+			hide_valid_moves()
 		
-		selected_domino = domino
-		domino.select()
-		show_valid_moves(domino)
+		if domino == selected_domino:
+			domino.deselect()
+			selected_domino = null
+			hide_valid_moves()
+		else:
+			selected_domino = domino
+			domino.select()
+			show_valid_moves(domino)
 	
 	is_processing_selection = false
 
@@ -587,43 +645,47 @@ func _on_domino_deselected():
 
 ### VISUAL FEEDBACK
 func show_valid_moves(domino: Domino):
-	hide_valid_moves()
+	hide_valid_moves()  # Clear any existing indicators
 	
 	if not domino or not is_instance_valid(domino):
 		return
-		
-	for i in tracks.size():
-		if can_place_on_track(domino, i):
-			var indicator = _get_or_create_indicator(tracks[i])
-			if indicator:
-				_position_indicator(tracks[i], domino)
-				var material = indicator.get_surface_override_material(0)
-				if tracks[i].pieces.size() == TRACK_LENGTH - 1:
-					material.albedo_color = Color(1, 0, 0, 0.7)
-				else:
-					material.albedo_color = Color(0, 1, 0, 0.5)
-				indicator.set_surface_override_material(0, material)
-				tracks[i]["static_body"].input_ray_pickable = true
+	
+	for track_idx in tracks.size():
+		if can_place_on_track(domino, track_idx):
+			var track = tracks[track_idx]
+			var pos_idx = track.pieces.size()
+			
+			# Create or get indicator
+			var indicator = _get_or_create_indicator(track)
+			indicator.visible = true
+			indicator.global_position = track.positions[pos_idx].global_position + Vector3(0, 0.02, 0)
+			
+			# Set color based on placement type
+			var mat = indicator.get_surface_override_material(0)
+			if track.pieces.size() == TRACK_LENGTH - 1:
+				mat.albedo_color = Color(1, 0, 0, 0.7)  # Red for completing track
+			else:
+				mat.albedo_color = Color(0, 1, 0, 0.5)  # Green for normal placement
+			indicator.set_surface_override_material(0, mat)
 
 func hide_valid_moves():
 	for track in tracks:
-		if track.has("static_body"):
-			track["static_body"].input_ray_pickable = false
+		if track.node.has_node("Indicator"):
+			track.node.get_node("Indicator").visible = false
 
 func _get_or_create_indicator(track: Dictionary) -> MeshInstance3D:
 	if not track.node.has_node("Indicator"):
+		# Create new indicator
 		var indicator = MeshInstance3D.new()
 		indicator.name = "Indicator"
 		indicator.mesh = BoxMesh.new()
 		indicator.mesh.size = Vector3(0.8, 0.01, 0.8)
 		
 		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0, 1, 0, 0.5)
 		mat.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
 		indicator.set_surface_override_material(0, mat)
 		
 		track.node.add_child(indicator)
-		indicator.owner = get_tree().edited_scene_root
 	
 	return track.node.get_node("Indicator")
 
@@ -635,7 +697,7 @@ func _position_indicator(track: Dictionary, _domino: Domino):
 
 ### INPUT HANDLING
 func _input(event):
-	if current_turn != "player":  # Block input during AI's turn
+	if current_turn != "player" or is_discard_mode:
 		return
 		
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:

@@ -57,39 +57,101 @@ const DOT_POSITIONS = {
 # ======================
 var is_selected := false
 var highlight_mesh: MeshInstance3D
+var highlight_material: StandardMaterial3D
 var is_in_hand := true
 var initial_position := Vector3.ZERO
 var is_selecting := false
 var top_label: Label3D
 var bottom_label: Label3D
-# Add this new variable to track visual flip state
 var is_flipped := false:
 	set(value):
 		is_flipped = value
-		_update_all_dots()  # Refresh dot display when flipped
-var display_top := true  # True = showing top_value, False = showing bottom_value
+		_update_all_dots()
+var display_top := true
+
 # ======================
 # CORE FUNCTIONS
 # ======================
 func _ready():
+	_ensure_highlight_components()
 	initial_position = global_position
 	contact_monitor = true
 	max_contacts_reported = 5
 	_setup_physics()
-	_setup_highlight()
 	_setup_domino_visuals()
 	_update_all_dots()
 	
 	if debug_visible:
 		_setup_debug_labels()
 	
-	print("Domino created with values: %d (top), %d (bottom)" % [top_value, bottom_value])
 	input_ray_pickable = true
 	_setup_input()
 
 func _physics_process(_delta: float):
 	if is_selected:
 		global_position.y = initial_position.y + 0.3
+
+# ======================
+# HIGHLIGHT SYSTEM
+# ======================
+func _ensure_highlight_components():
+	if not is_instance_valid(highlight_mesh):
+		highlight_mesh = MeshInstance3D.new()
+		highlight_mesh.name = "HighlightMesh"
+		
+		var box = BoxMesh.new()
+		box.size = Vector3(HIGHLIGHT_WIDTH, HIGHLIGHT_HEIGHT, HIGHLIGHT_THICKNESS)
+		highlight_mesh.mesh = box
+		
+		highlight_material = StandardMaterial3D.new()
+		highlight_material.albedo_color = Color(1, 0.8, 0.2, 0.6)
+		highlight_material.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
+		highlight_mesh.set_surface_override_material(0, highlight_material)
+		
+		highlight_mesh.position = Vector3(0, 0, HIGHLIGHT_Z_OFFSET)
+		highlight_mesh.rotation_degrees = Vector3(90, 0, 0)
+		add_child(highlight_mesh)
+		highlight_mesh.visible = false
+
+func set_highlight(enable: bool, color: Color = Color(1, 0.8, 0.2, 0.6)):
+	_ensure_highlight_components()
+	if not is_instance_valid(highlight_mesh) or not is_instance_valid(highlight_material):
+		push_error("Highlight components not initialized")
+		return
+	
+	highlight_mesh.visible = enable
+	highlight_material.albedo_color = color
+
+# ======================
+# SETUP FUNCTIONS
+# ======================
+func _setup_physics():
+	var material = PhysicsMaterial.new()
+	material.bounce = BOUNCE
+	material.friction = FRICTION
+	physics_material_override = material
+	
+	mass = HAND_MASS if is_in_hand else BOARD_MASS
+	freeze = is_in_hand
+	continuous_cd = true
+	collision_layer = 0b10 if is_in_hand else 0b01
+	collision_mask = collision_layer
+
+func _setup_domino_visuals():
+	var mesh = $MeshInstance3D
+	mesh.mesh.size = Vector3(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_THICKNESS)
+	
+	for side in ["TopDots", "BottomDots"]:
+		if not has_node(side):
+			continue
+			
+		var dots_node = get_node(side)
+		for i in range(1, 8):
+			var dot_name = "Dot%d" % i
+			var dot = _get_or_create_dot(dots_node, dot_name)
+			var pos = DOT_POSITIONS[i]
+			dot.position = Vector3(pos.x, pos.y, DOT_Z_OFFSET)
+			_setup_dot_appearance(dot)
 
 func _setup_debug_labels():
 	top_label = Label3D.new()
@@ -107,88 +169,8 @@ func _setup_debug_labels():
 	add_child(bottom_label)
 
 # ======================
-# SETUP FUNCTIONS
-# ======================
-func _setup_physics():
-	var material = PhysicsMaterial.new()
-	material.bounce = BOUNCE
-	material.friction = FRICTION
-	physics_material_override = material
-	
-	mass = HAND_MASS if is_in_hand else BOARD_MASS
-	freeze = is_in_hand
-	continuous_cd = true
-	collision_layer = 0b10 if is_in_hand else 0b01
-	collision_mask = collision_layer
-
-func _setup_highlight():
-	if has_node("HighlightMesh"):
-		$HighlightMesh.queue_free()
-	
-	highlight_mesh = MeshInstance3D.new()
-	highlight_mesh.name = "HighlightMesh"
-	
-	var box = BoxMesh.new()
-	# Make highlight flat (Y is up in Godot, so we want Z to be thickness)
-	box.size = Vector3(HIGHLIGHT_WIDTH, HIGHLIGHT_HEIGHT, 0.001)  # Thin in Z-axis
-	
-	highlight_mesh.mesh = box
-	
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 0.8, 0.2, 0.6)
-	mat.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
-	highlight_mesh.set_surface_override_material(0, mat)
-	
-	# Position and rotate to lie flat on domino
-	highlight_mesh.position = Vector3(0, 0, DOMINO_THICKNESS/2 + 0.001)
-	highlight_mesh.rotation_degrees = Vector3(90, 0, 0)  # Rotate to lie flat
-	
-	add_child(highlight_mesh)
-	highlight_mesh.owner = get_tree().edited_scene_root
-	highlight_mesh.visible = false
-
-# ======================
 # VISUAL FUNCTIONS
 # ======================
-func _setup_domino_visuals():
-	var mesh = $MeshInstance3D
-	mesh.mesh.size = Vector3(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_THICKNESS)
-	
-	for side in ["TopDots", "BottomDots"]:
-		if not has_node(side):
-			continue
-			
-		var dots_node = get_node(side)
-		for i in range(1, 8):
-			var dot_name = "Dot%d" % i
-			var dot = _get_or_create_dot(dots_node, dot_name)
-			var pos = DOT_POSITIONS[i]
-			dot.position = Vector3(pos.x, pos.y, DOT_Z_OFFSET)
-			_setup_dot_appearance(dot)
-
-func _process(_delta):
-	if Input.is_key_pressed(KEY_V):
-		print("Current Visual: %d-%d | Rotation: %s" % [
-			top_value if display_top else bottom_value,
-			bottom_value if display_top else top_value,
-			str(rotation_degrees)
-		])
-
-		
-func get_visual_values() -> String:
-	return "Visual: %d-%d | Logical: %d-%d" % [
-		bottom_value, top_value,  # Inverted!
-		top_value, bottom_value
-	]
-
-func get_visual_representation() -> String:
-	return "%d-%d (Rotation: %s)" % [
-		top_value if display_top else bottom_value,
-		bottom_value if display_top else top_value,
-		str(rotation_degrees)
-	]
-
-# Modified dot update functions
 func _update_top_dots():
 	if has_node("TopDots"):
 		_update_dots_for_value($TopDots, bottom_value if display_top else top_value)
@@ -216,14 +198,12 @@ func _update_dots_for_value(dots_node: Node3D, value: int):
 		6: _show_dots(dots_node, range(2, 8))
 
 func flip():
-	"""Flip the domino visually without changing values"""
 	is_flipped = !is_flipped
 	var tween = create_tween()
 	tween.tween_property(self, "rotation_degrees:x", 270, 0.1)
 	tween.tween_property(self, "rotation_degrees:x", 90, 0.1)
 
 func flip_display():
-	"""Flip which side is visually showing without changing values"""
 	display_top = !display_top
 	rotation_degrees.y = 180 if !display_top else 0
 	_update_all_dots()
@@ -242,7 +222,6 @@ func _setup_input():
 func _on_input_event(_camera: Node, event: InputEvent, click_position: Vector3, _normal: Vector3, _shape_idx: int):
 	if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or \
 		(event is InputEventScreenTouch and event.pressed):
-			print("Domino clicked: ", top_value, "-", bottom_value)
 			if is_selected:
 				deselect()
 				emit_signal("domino_deselected")
@@ -261,16 +240,13 @@ func select():
 	is_selecting = true
 	is_selected = true
 	freeze = false
-	global_position.y += 0
-	if highlight_mesh:
-		highlight_mesh.visible = true
+	set_highlight(true)
 	is_selecting = false
 
 func deselect():
 	is_selected = false
 	freeze = true
-	if highlight_mesh:
-		highlight_mesh.visible = false
+	set_highlight(false)
 
 # ======================
 # GAMEPLAY FUNCTIONS
@@ -296,7 +272,6 @@ func _get_or_create_dot(parent: Node3D, dot_name: String) -> MeshInstance3D:
 	return dot
 
 func get_connecting_value() -> int:
-	"""Returns the value that should connect to other dominos"""
 	return top_value if display_top else bottom_value
 
 func _setup_dot_appearance(dot: MeshInstance3D):
@@ -319,7 +294,6 @@ func _show_dot(dots_node: Node3D, dot_num: int):
 	var dot = dots_node.get_node("Dot%d" % dot_num) as MeshInstance3D
 	if is_instance_valid(dot):
 		dot.visible = true
-		
+
 func get_visible_side() -> int:
-	"""Returns the value currently facing up"""
 	return bottom_value if is_flipped else top_value

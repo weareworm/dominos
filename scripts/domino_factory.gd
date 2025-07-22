@@ -5,6 +5,9 @@ class_name DominoFactory
 const DOMINO_SCENE = preload("res://scenes/domino.tscn")
 
 func create_random_domino() -> Node:
+	if get_parent().domino_pool.size() == 0:
+		print("FACTORY ERROR: Empty pool when creating random domino")
+		return null
 	var top_value = randi() % 7  # Values 0-6
 	var bottom_value = randi() % 7
 	return create_specific_domino(top_value, bottom_value)
