@@ -402,7 +402,7 @@ func ai_discard_domino():
 	
 	print("AI is discarding a domino")
 	
-	# Select a domino to discard (prefer non-doubles)
+	# 1. Select domino to discard (prefer non-doubles)
 	var discard_index = 0
 	for i in range(ai_hand.size()):
 		if ai_hand[i][0] != ai_hand[i][1]:  # Find first non-double
@@ -412,28 +412,35 @@ func ai_discard_domino():
 	var discarded_values = ai_hand[discard_index]
 	print("AI discarding: ", discarded_values)
 	
-	# Visual feedback
+	# 2. Visual feedback
 	var visual_domino = domino_factory.create_specific_domino(discarded_values[0], discarded_values[1])
 	add_child(visual_domino)
-	visual_domino.global_position = Vector3(0, 2, 0)  # Above board
+	visual_domino.global_position = Vector3(0, 2, 0)
 	visual_domino.set_highlight(true, Color.PURPLE)
 	
-	# Animate the discard
+	# 3. Animate the discard
 	var tween = create_tween()
 	tween.tween_property(visual_domino, "position:y", 0, 0.3)
 	await tween.finished
 	
-	# Return to pool and draw new
+	# 4. Return to pool and SHUFFLE
 	domino_pool.append(discarded_values)
 	ai_hand.remove_at(discard_index)
+	domino_pool.shuffle()  # CRITICAL: Shuffle before drawing
 	
+	# 5. Draw new random domino
 	if domino_pool.size() > 0:
 		var new_values = domino_pool.pop_back()
+		# Verify we're not drawing the same domino
+		while new_values == discarded_values and domino_pool.size() > 1:
+			domino_pool.append(new_values)  # Put it back
+			domino_pool.shuffle()
+			new_values = domino_pool.pop_back()
+		
 		ai_hand.append(new_values)
 		print("AI drew new domino: ", new_values)
 	
 	visual_domino.queue_free()
-	domino_pool.shuffle()
 	end_ai_turn()
 
 func ai_play_domino(domino_values: Array, track_idx: int):
