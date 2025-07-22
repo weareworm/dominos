@@ -81,12 +81,14 @@ func _setup_camera():
 
 func initialize_domino_pool():
 	domino_pool.clear()
-	# Create all 28 unique domino combinations
+	# Create standard set (28 dominos)
 	for i in range(7):
 		for j in range(i, 7):
 			domino_pool.append([i, j])
+	# Duplicate to make 56 dominos
+	domino_pool += domino_pool.duplicate()
 	domino_pool.shuffle()
-	print("Initialized pool with ", domino_pool.size(), " dominos")  # Should print 28
+	print("Initialized 56 dominos (two sets)")
 
 func _initialize_tracks():
 	for i in TRACK_COUNT:
@@ -149,44 +151,18 @@ func enable_discard_mode():
 		button.visible = true
 
 func confirm_discard() -> bool:
-	if not discard_candidate or not is_instance_valid(discard_candidate):
-		return false
+	if not discard_candidate: return false
 	
-	print("Discarding: ", discard_candidate.top_value, "-", discard_candidate.bottom_value)
-	print("Pool before: ", domino_pool.size())
-	
-	# Store values before removal
-	var values = [discard_candidate.top_value, discard_candidate.bottom_value]
-	var discard_index = player_hand.find(discard_candidate)
-	
-	if discard_index == -1:
-		print("ERROR: Domino not found in hand!")
-		return false
-	
-	# Remove from hand and scene
-	player_hand.remove_at(discard_index)
-	remove_child(discard_candidate)
-	discard_candidate.queue_free()
-	
-	# ALWAYS return to pool (including doubles)
-	domino_pool.append(values)
-	domino_pool.shuffle()
-	print("Returned to pool: ", values)
-	
-	# Draw replacement
+	# Return to pool and draw new
+	domino_pool.append([discard_candidate.top_value, discard_candidate.bottom_value])
 	if domino_pool.size() > 0:
 		var new_values = domino_pool.pop_back()
-		print("Drawing new domino: ", new_values)
 		var new_domino = domino_factory.create_specific_domino(new_values[0], new_values[1])
-		_setup_hand_domino(new_domino, Vector3.ZERO, player_hand.size())
-		add_child(new_domino)
 		player_hand.append(new_domino)
-		_safe_connect_domino_signals(new_domino)
-	else:
-		print("WARNING: Pool empty - cannot draw replacement")
 	
-	reposition_hand()
-	print("Pool after: ", domino_pool.size())
+	player_hand.erase(discard_candidate)
+	discard_candidate.queue_free()
+	domino_pool.shuffle()
 	return true
 
 func disable_discard_mode():
