@@ -23,3 +23,7 @@ window/size/resizable=false
 window/stretch/mode="viewport"
 window/stretch/aspect="keep_width"
 window/handheld/orientation=1
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true

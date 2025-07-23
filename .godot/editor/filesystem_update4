@@ -1,12 +1,2 @@
-res://scenes/main.tscn
-res://meshes/dot_mesh.tres
-res://scenes/domino.tscn
-res://scenes/position_marker.tscn
-res://scenes/board.tscn
-res://UI/score_display.tscn
-res://scripts/board.gd
-res://scripts/domino.gd
-res://scripts/domino_factory.gd
-res://scripts/score_display.gd
 res://UI/game_over_screen.tscn
-res://UI/game_over_screen.gd
+res://meshes/dot_mesh.tres
