@@ -532,12 +532,10 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 	print("AI playing ", domino_values[0], "-", domino_values[1], " on track ", track_idx+1)
 	
 	var is_double = domino_values[0] == domino_values[1]
-	
-	# Create and position visual domino first
 	var visual_domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
 	add_child(visual_domino)
 	
-	# Get target position BEFORE creating permanent domino
+	# Get target position safely
 	var target_position = tracks[track_idx].positions[tracks[track_idx].pieces.size()].global_transform.origin + Vector3(0, 0.2, 0)
 	visual_domino.global_position = target_position + Vector3(0, 2, 0)
 	
@@ -547,9 +545,11 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 		if has_node("DoubleSound"):
 			$DoubleSound.play()
 	
-	# Create permanent domino (but don't add to tree yet)
+	# Create permanent domino
 	var permanent_domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
 	permanent_domino.visible = false
+	add_child(permanent_domino)
+	permanent_domino.global_position = target_position
 	permanent_domino.freeze = true
 	permanent_domino.is_in_hand = false
 	permanent_domino.place_on_board()
@@ -575,15 +575,11 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 	
 	await tween.finished
 	
-	# Now add permanent domino to tree and position it
-	add_child(permanent_domino)
-	permanent_domino.global_position = target_position
+	# Finalize placement
 	permanent_domino.visible = true
-	
-	# Clean up visual domino
 	visual_domino.queue_free()
 	
-	# Add to track and update game state
+	# Add to track
 	tracks[track_idx].pieces.append(permanent_domino)
 	ai_hand.erase(domino_values)
 	
@@ -592,17 +588,19 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 		has_extra_turn = true
 		print("AI played double domino - extra turn queued")
 	
-	# Refill AI hand if needed
+	# Refill hand if needed
 	if ai_hand.size() < MAX_HAND_SIZE and domino_pool.size() > 0:
 		refill_ai_hand()
 	
-	# Check for track completion
+	# Check for track completion (MOVED SCORING TO _clear_and_restart_track)
 	if tracks[track_idx].pieces.size() == TRACK_LENGTH:
 		var first = tracks[track_idx].pieces.front()
 		var last = tracks[track_idx].pieces.back()
 		if (first.top_value if first.display_top else first.bottom_value) == (last.bottom_value if last.display_top else last.top_value):
 			_clear_and_restart_track(track_idx)
-			update_scores(0, 1)  # AI scores points
+			# REMOVED THE update_scores CALL FROM HERE
+	
+	return true
 
 func end_player_turn():
 	if is_discard_mode:
@@ -719,18 +717,27 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 		
 		if first_value == last_value:
 			_clear_and_restart_track(track_idx)
-			# Score points (1 for player, 0 for AI - handled in update_scores)
-# Handle scoring for track completion
-		if current_turn == "player":
-			update_scores(1, 0)  # Player gets 1 point
-		else:
-			update_scores(0, 1)  # AI gets 1 point
 	return true
 
 func _clear_and_restart_track(track_idx: int):
 	var track = tracks[track_idx]
 	
-	# Return ALL dominos to pool
+	# Check if this is a valid completion (first and last match)
+	var first = track.pieces.front()
+	var last = track.pieces.back()
+	var first_value = first.top_value if first.display_top else first.bottom_value
+	var last_value = last.bottom_value if last.display_top else last.top_value
+	
+	if first_value != last_value:
+		return  # Not a valid completion
+	
+	# Score points (only once)
+	if current_turn == "player":
+		update_scores(1, 0)
+	else:
+		update_scores(0, 1)
+	
+	# [Rest of your existing track clearing code]
 	for domino in track.pieces:
 		if is_instance_valid(domino):
 			domino_pool.append([domino.top_value, domino.bottom_value])
@@ -740,22 +747,14 @@ func _clear_and_restart_track(track_idx: int):
 	domino_pool.shuffle()
 	print("Returned track dominos to pool. New pool size: ", domino_pool.size())
 	
-	# Award points
-	if current_turn == "player":
-		update_scores(1, 0)
-	else:
-		update_scores(0, 1)
-	
-	# Create new starting domino
+	# Restart track
 	if domino_pool.size() > 0:
 		var new_domino = domino_factory.create_random_domino()
 		if new_domino:
 			new_domino.is_in_hand = false
 			new_domino.place_on_board()
 			add_child(new_domino)
-			await try_place_domino(new_domino, track_idx)
-	else:
-		print("ERROR: No dominos left in pool to restart track!")
+			await try_place_domino(new_domino, track_idx, true)
 
 ### SIGNAL HANDLING
 func _safe_connect_domino_signals(domino: Domino):
