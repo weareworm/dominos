@@ -429,18 +429,43 @@ func check_pass_button_state():
 func start_ai_turn():
 	print("AI's turn starting - Current hand size: ", ai_hand.size())
 	
-	# Try normal moves first
+	# Clear any leftover extra turn flag
+	has_extra_turn = false
+	
+	# Check for double piece first
+	var double_move = _find_ai_double_move()
+	if double_move:
+		await ai_play_domino(double_move.values, double_move.track)
+		if has_extra_turn:
+			print("AI gets ONE extra turn from double")
+			has_extra_turn = false  # Clear immediately after detecting
+			await get_tree().create_timer(0.5).timeout
+			start_ai_turn()  # Take exactly one extra turn
+			return
+	
+	# Normal move if no double available
 	var valid_moves = _find_ai_valid_moves()
 	if valid_moves.size() > 0:
 		await ai_play_domino(valid_moves[0].values, valid_moves[0].track)
-		return
-	
-	# If no moves, attempt to discard
-	if ai_hand.size() > 0 and domino_pool.size() > 0:
-		await ai_discard_domino()
 	else:
-		print("AI has no moves and cannot discard")
-		end_ai_turn()
+		await ai_discard_domino()
+	
+	end_ai_turn()
+
+func _find_ai_double_move() -> Dictionary:
+	for domino_values in ai_hand:
+		if domino_values[0] == domino_values[1]:  # Check if double
+			var domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
+			for track_idx in tracks.size():
+				if can_place_on_track(domino, track_idx):
+					domino.queue_free()
+					return {
+						"values": domino_values,
+						"track": track_idx,
+						"is_double": true
+					}
+			domino.queue_free()
+	return {}
 
 func _find_ai_valid_moves() -> Array:
 	var valid_moves = []
@@ -506,19 +531,25 @@ func ai_discard_domino():
 func ai_play_domino(domino_values: Array, track_idx: int):
 	print("AI playing ", domino_values[0], "-", domino_values[1], " on track ", track_idx+1)
 	
-	# Create the temporary visual domino for animation
+	var is_double = domino_values[0] == domino_values[1]
+	
+	# Create and position visual domino first
 	var visual_domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
 	add_child(visual_domino)
 	
-	# Position it above the board for the animation
+	# Get target position BEFORE creating permanent domino
 	var target_position = tracks[track_idx].positions[tracks[track_idx].pieces.size()].global_transform.origin + Vector3(0, 0.2, 0)
-	visual_domino.global_position = target_position + Vector3(0, 2, 0)  # Start above
+	visual_domino.global_position = target_position + Vector3(0, 2, 0)
 	
-	# Create the permanent domino but keep it hidden initially
+	# Special effects for doubles
+	if is_double:
+		visual_domino.scale = Vector3(1.3, 1.3, 1.3)
+		if has_node("DoubleSound"):
+			$DoubleSound.play()
+	
+	# Create permanent domino (but don't add to tree yet)
 	var permanent_domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
-	permanent_domino.visible = false  # Start hidden
-	add_child(permanent_domino)
-	permanent_domino.global_position = target_position
+	permanent_domino.visible = false
 	permanent_domino.freeze = true
 	permanent_domino.is_in_hand = false
 	permanent_domino.place_on_board()
@@ -537,37 +568,41 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 		permanent_domino._update_all_dots()
 		visual_domino._update_all_dots()
 	
-	# Animate the visual domino falling
+	# Animate falling
 	var tween = create_tween()
 	tween.tween_property(visual_domino, "global_position", target_position, 0.5)\
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	
-	# When animation completes:
-	tween.tween_callback(func():
-		# Show the permanent domino
-		permanent_domino.visible = true
-		# Remove the visual domino
-		visual_domino.queue_free()
-		
-		# Add to track pieces
-		tracks[track_idx].pieces.append(permanent_domino)
-		ai_hand.erase(domino_values)
-		
-		ai_hand.erase(domino_values)
-		if ai_hand.size() < MAX_HAND_SIZE and domino_pool.size() > 0:
-			refill_ai_hand()
-		
-		# Check for track completion
-		if tracks[track_idx].pieces.size() == TRACK_LENGTH:
-			var first = tracks[track_idx].pieces.front()
-			var last = tracks[track_idx].pieces.back()
-			if (first.top_value if first.display_top else first.bottom_value) == (last.bottom_value if last.display_top else last.top_value):
-				_clear_and_restart_track(track_idx)
-		
-		end_ai_turn()
-	)
-
-
+	await tween.finished
+	
+	# Now add permanent domino to tree and position it
+	add_child(permanent_domino)
+	permanent_domino.global_position = target_position
+	permanent_domino.visible = true
+	
+	# Clean up visual domino
+	visual_domino.queue_free()
+	
+	# Add to track and update game state
+	tracks[track_idx].pieces.append(permanent_domino)
+	ai_hand.erase(domino_values)
+	
+	# Handle double domino
+	if is_double:
+		has_extra_turn = true
+		print("AI played double domino - extra turn queued")
+	
+	# Refill AI hand if needed
+	if ai_hand.size() < MAX_HAND_SIZE and domino_pool.size() > 0:
+		refill_ai_hand()
+	
+	# Check for track completion
+	if tracks[track_idx].pieces.size() == TRACK_LENGTH:
+		var first = tracks[track_idx].pieces.front()
+		var last = tracks[track_idx].pieces.back()
+		if (first.top_value if first.display_top else first.bottom_value) == (last.bottom_value if last.display_top else last.top_value):
+			_clear_and_restart_track(track_idx)
+			update_scores(0, 1)  # AI scores points
 
 func end_player_turn():
 	if is_discard_mode:
@@ -584,12 +619,6 @@ func end_player_turn():
 	start_ai_turn()
 
 func end_ai_turn():
-	if has_extra_turn:
-		has_extra_turn = false
-		print("AI takes extra turn")
-		start_ai_turn()
-		return
-		
 	current_turn = "player"
 	update_turn_indicator()
 
