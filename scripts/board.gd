@@ -27,7 +27,7 @@ var is_discard_mode := false
 var discard_candidate: Domino = null
 var game_winner: String = ""
 var is_game_over := false
-
+var has_extra_turn := false  # Add with other game state variables
 
 func _ready():
 	print("Initializing game...")
@@ -239,7 +239,7 @@ func spawn_starting_dominos():
 		domino.is_in_hand = false
 		domino.place_on_board()
 		add_child(domino)
-		await try_place_domino(domino, i)
+		await try_place_domino(domino, i, true)  # Note the added true parameter
 
 func _on_pass_button_pressed():
 	if current_turn != "player" or player_has_valid_moves():
@@ -361,6 +361,12 @@ func update_turn_indicator():
 		if score_ui.has_node("AITurnIndicator"):
 			var ai_indicator = score_ui.get_node("AITurnIndicator")
 			ai_indicator.visible = true
+	if score_ui.has_node("TurnLabel"):
+		var turn_label = score_ui.get_node("TurnLabel")
+		if has_extra_turn and current_turn == "player":
+			turn_label.text = "EXTRA TURN!"
+			turn_label.modulate = Color.GOLD
+
 
 func check_for_winner():
 	if player_score >= 3:
@@ -564,20 +570,26 @@ func ai_play_domino(domino_values: Array, track_idx: int):
 
 
 func end_player_turn():
-	# Only proceed if not in discard mode
 	if is_discard_mode:
 		return
-	
+		
+	if has_extra_turn:
+		has_extra_turn = false
+		print("Player takes extra turn")
+		return  # Don't change turns
+		
 	current_turn = "ai"
 	update_turn_indicator()
-	
-	# Small delay before AI moves
 	await get_tree().create_timer(0.5).timeout
 	start_ai_turn()
 
 func end_ai_turn():
-	print("AI ending turn - hand size now: ", ai_hand.size())
-	print("Domino pool size: ", domino_pool.size())
+	if has_extra_turn:
+		has_extra_turn = false
+		print("AI takes extra turn")
+		start_ai_turn()
+		return
+		
 	current_turn = "player"
 	update_turn_indicator()
 
@@ -607,7 +619,7 @@ func can_place_on_track(domino: Domino, track_idx: int) -> bool:
 		
 	return false
 
-func try_place_domino(domino: Domino, track_idx: int) -> bool:
+func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool = false) -> bool:
 	if not is_instance_valid(domino):
 		return false
 		
@@ -617,7 +629,8 @@ func try_place_domino(domino: Domino, track_idx: int) -> bool:
 	if pos_idx >= track.positions.size():
 		return false
 	
-	if pos_idx > 0:
+	# Check if domino matches the track rules
+	if pos_idx > 0:  # Only check matching for non-starting dominos
 		var last = track.pieces.back()
 		var must_match = last.bottom_value if last.display_top else last.top_value
 		
@@ -630,6 +643,7 @@ func try_place_domino(domino: Domino, track_idx: int) -> bool:
 			
 		domino._update_all_dots()
 	
+	# Place the domino physically
 	domino.freeze = false
 	if domino.get_parent() != self:
 		add_child(domino)
@@ -640,22 +654,44 @@ func try_place_domino(domino: Domino, track_idx: int) -> bool:
 	await get_tree().physics_frame
 	domino.freeze = true
 	
+	# Add to track
 	track.pieces.append(domino)
-	player_hand.erase(domino)
+	if not is_starting_domino:  # Only remove from hand if not starting domino
+		player_hand.erase(domino)
 	
+	# Check for double domino (only for non-starting dominos)
+	if not is_starting_domino and domino.top_value == domino.bottom_value:
+		has_extra_turn = true
+		# Visual feedback
+		var tween = create_tween()
+		tween.tween_property(domino, "scale", Vector3(1.3, 1.3, 1.3), 0.2)
+		tween.tween_property(domino, "scale", Vector3(1, 1, 1), 0.2)
+		if has_node("DoubleSound"):
+			$DoubleSound.play()
+		print("Double domino played - extra turn granted!")
+	
+	# Handle selection cleanup
 	if domino == selected_domino:
 		domino.deselect()
 		selected_domino = null
 		hide_valid_moves()
 	
-	refill_hand()
-	reposition_hand()
+	# Refill hand if needed (only for player turns)
+	if not is_starting_domino and current_turn == "player":
+		refill_hand()
+		reposition_hand()
 	
+	# Check for track completion
 	if track.pieces.size() == TRACK_LENGTH:
 		var first = track.pieces.front()
 		var last = track.pieces.back()
-		if (first.top_value if first.display_top else first.bottom_value) == (last.bottom_value if last.display_top else last.top_value):
+		var first_value = first.top_value if first.display_top else first.bottom_value
+		var last_value = last.bottom_value if last.display_top else last.top_value
+		
+		if first_value == last_value:
 			_clear_and_restart_track(track_idx)
+			# Score points (1 for player, 0 for AI - handled in update_scores)
+			update_scores(1, 0) if current_turn == "player" else update_scores(0, 1)
 	
 	return true
 
