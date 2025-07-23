@@ -31,7 +31,6 @@ var has_extra_turn := false  # Add with other game state variables
 
 func _ready():
 	print("Initializing game...")
-	initialize_domino_pool()
 	_initialize_game()
 	_initialize_score_ui()
 	update_scores(0, 0)
@@ -84,14 +83,15 @@ func _setup_camera():
 
 func initialize_domino_pool():
 	domino_pool.clear()
-	# Create standard set (28 dominos)
-	for i in range(7):
-		for j in range(i, 7):
+	# Create standard double-six set (28 unique dominos)
+	for i in range(7):  # 0-6
+		for j in range(i, 7):  # This creates all unique combinations
 			domino_pool.append([i, j])
-	# Duplicate to make 56 dominos
+	
+	# For a double set (56 total), duplicate and shuffle
 	domino_pool += domino_pool.duplicate()
 	domino_pool.shuffle()
-	print("Initialized 56 dominos (two sets)")
+	print("Initialized domino pool with %d pieces (double set)" % domino_pool.size())
 
 func _initialize_tracks():
 	for i in TRACK_COUNT:
