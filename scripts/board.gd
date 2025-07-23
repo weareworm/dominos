@@ -691,8 +691,11 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 		if first_value == last_value:
 			_clear_and_restart_track(track_idx)
 			# Score points (1 for player, 0 for AI - handled in update_scores)
-			update_scores(1, 0) if current_turn == "player" else update_scores(0, 1)
-	
+# Handle scoring for track completion
+		if current_turn == "player":
+			update_scores(1, 0)  # Player gets 1 point
+		else:
+			update_scores(0, 1)  # AI gets 1 point
 	return true
 
 func _clear_and_restart_track(track_idx: int):
