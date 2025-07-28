@@ -36,6 +36,18 @@ func _ready():
 	update_scores(0, 0)
 	current_turn = "player"
 	
+	# Set mobile resolution (matches your 720×1208 target)
+	get_viewport().size = Vector2i(720, 1208)
+	
+	# Correct Godot 4 viewport scaling settings:
+	get_viewport().scaling_3d_scale = 1.0  # Disable 3D scaling
+	get_viewport().canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	
+	# Alternative approach via project settings (recommended):
+	# These can be set in Project → Project Settings → Display → Window
+	# - Stretch Mode: canvas_items
+	# - Stretch Aspect: keep
+	
 	# Safe signal connection
 	if score_ui:
 		# Clean up existing connections
@@ -43,7 +55,7 @@ func _ready():
 			score_ui.pass_turn_requested.disconnect(_on_pass_turn_requested)
 		score_ui.pass_turn_requested.connect(_on_pass_turn_requested)
 		
-		# Connect discard signal to handler (not directly to confirm_discard)
+		# Connect discard signal to handler
 		if score_ui.has_signal("discard_confirmed"):
 			if score_ui.discard_confirmed.is_connected(_on_discard_confirmed):
 				score_ui.discard_confirmed.disconnect(_on_discard_confirmed)
