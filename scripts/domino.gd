@@ -1,15 +1,11 @@
 extends RigidBody3D
 class_name Domino
 
-# ======================
-# SIGNALS
-# ======================
+### SIGNALS ###
 signal domino_selected(domino)
 signal domino_deselected
 
-# ======================
-# CONSTANTS
-# ======================
+### CONSTANTS ###
 const DOMINO_WIDTH = 0.16
 const DOMINO_HEIGHT = 0.32
 const DOMINO_THICKNESS = 0.055
@@ -35,9 +31,7 @@ const DOT_POSITIONS = {
 	7: Vector2(0.03, -0.04)
 }
 
-# ======================
-# EXPORTED VARIABLES
-# ======================
+### EXPORTED VARIABLES ###
 @export_range(0, 6) var top_value := 1:
 	set(value):
 		top_value = clamp(value, 0, 6)
@@ -52,9 +46,7 @@ const DOT_POSITIONS = {
 
 @export var debug_visible := false
 
-# ======================
-# STATE VARIABLES
-# ======================
+### MEMBER VARIABLES ###
 var is_selected := false
 var highlight_mesh: MeshInstance3D
 var highlight_material: StandardMaterial3D
@@ -66,12 +58,10 @@ var bottom_label: Label3D
 var is_flipped := false:
 	set(value):
 		is_flipped = value
-		_update_all_dots()
+		update_dots()
 var display_top := true
 
-# ======================
-# CORE FUNCTIONS
-# ======================
+### READY FUNCTION ###
 func _ready():
 	_ensure_highlight_components()
 	initial_position = global_position
@@ -79,7 +69,7 @@ func _ready():
 	max_contacts_reported = 5
 	_setup_physics()
 	_setup_domino_visuals()
-	_update_all_dots()
+	update_dots()
 	
 	if debug_visible:
 		_setup_debug_labels()
@@ -87,13 +77,12 @@ func _ready():
 	input_ray_pickable = true
 	_setup_input()
 
+### PHYSICS PROCESS ###
 func _physics_process(_delta: float):
 	if is_selected:
 		global_position.y = initial_position.y + 0.3
 
-# ======================
-# HIGHLIGHT SYSTEM
-# ======================
+### HIGHLIGHT FUNCTIONS ###
 func _ensure_highlight_components():
 	if not is_instance_valid(highlight_mesh):
 		highlight_mesh = MeshInstance3D.new()
@@ -122,9 +111,7 @@ func set_highlight(enable: bool, color: Color = Color(1, 0.8, 0.2, 0.6)):
 	highlight_mesh.visible = enable
 	highlight_material.albedo_color = color
 
-# ======================
-# SETUP FUNCTIONS
-# ======================
+### SETUP FUNCTIONS ###
 func _setup_physics():
 	var material = PhysicsMaterial.new()
 	material.bounce = BOUNCE
@@ -168,9 +155,7 @@ func _setup_debug_labels():
 	bottom_label.position = Vector3(0, -DOMINO_HEIGHT/2 - 0.02, DOMINO_THICKNESS/2 + 0.001)
 	add_child(bottom_label)
 
-# ======================
-# VISUAL FUNCTIONS
-# ======================
+### DOT FUNCTIONS ###
 func _update_top_dots():
 	if has_node("TopDots"):
 		_update_dots_for_value($TopDots, bottom_value if display_top else top_value)
@@ -179,7 +164,7 @@ func _update_bottom_dots():
 	if has_node("BottomDots"):
 		_update_dots_for_value($BottomDots, top_value if display_top else bottom_value)
 
-func _update_all_dots():
+func update_dots():
 	_update_top_dots()
 	_update_bottom_dots()
 
@@ -206,11 +191,9 @@ func flip():
 func flip_display():
 	display_top = !display_top
 	rotation_degrees.y = 180 if !display_top else 0
-	_update_all_dots()
+	update_dots()
 
-# ======================
-# INPUT HANDLING
-# ======================
+### INPUT FUNCTIONS ###
 func _setup_input():
 	if input_event.is_connected(_on_input_event):
 		input_event.disconnect(_on_input_event)
@@ -231,9 +214,7 @@ func _on_input_event(_camera: Node, event: InputEvent, click_position: Vector3, 
 				if is_in_hand:
 					global_position = click_position + Vector3(0, 0.2, 0)
 
-# ======================
-# SELECTION LOGIC
-# ======================
+### SELECTION FUNCTIONS ###
 func select():
 	if is_selecting:
 		return
@@ -248,9 +229,7 @@ func deselect():
 	freeze = true
 	set_highlight(false)
 
-# ======================
-# GAMEPLAY FUNCTIONS
-# ======================
+### GAMEPLAY FUNCTIONS ###
 func place_on_board():
 	is_in_hand = false
 	freeze = false
@@ -258,9 +237,7 @@ func place_on_board():
 	collision_mask = 0b01
 	mass = BOARD_MASS
 
-# ======================
-# HELPER FUNCTIONS
-# ======================
+### HELPER FUNCTIONS ###
 func _get_or_create_dot(parent: Node3D, dot_name: String) -> MeshInstance3D:
 	if parent.has_node(dot_name):
 		return parent.get_node(dot_name)
