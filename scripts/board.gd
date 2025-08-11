@@ -496,14 +496,14 @@ func can_place_on_track(domino: Domino, track_idx: int) -> bool:
 func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool = false) -> bool:
 	if not is_instance_valid(domino):
 		return false
-
+	
 	var track = tracks[track_idx]
 	var pos_idx = track.pieces.size()
-
+	
 	if pos_idx >= track.positions.size():
 		return false
-
-	# Check if domino matches the track rules
+	
+	# Check if domino matches the track rules (skip check if power domino)
 	if pos_idx > 0 and not domino.is_power_domino:
 		var last = track.pieces.back()
 		var must_match = last.bottom_value if last.display_top else last.top_value
@@ -516,24 +516,38 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 			return false
 
 		domino.update_dots()
-
+	
 	# Place the domino physically
 	domino.freeze = false
 	if domino.get_parent() != self:
 		add_child(domino)
-
+	
 	domino.global_transform = track.positions[pos_idx].global_transform
 	domino.global_position.y += 0.2
-
-	# Removed await here — just proceed immediately
-
+	
+	await get_tree().physics_frame
 	domino.freeze = true
-
+	
 	# Add to track
 	track.pieces.append(domino)
 	if not is_starting_domino:
 		player_hand.erase(domino)
-
+	
+	if domino.is_power_domino:
+		# Remove last domino on the track before power domino
+		if track.pieces.size() > 1:
+			var last_domino_index = track.pieces.size() - 2
+			var last_domino = track.pieces[last_domino_index]
+			if is_instance_valid(last_domino):
+				track.pieces.remove_at(last_domino_index)
+				last_domino.queue_free()
+		
+		# Remove the power domino itself as it is spent
+		track.pieces.remove_at(track.pieces.size() - 1)
+		domino.queue_free()
+		# No refill or further processing for the spent power domino
+		return true
+	
 	# Check for double domino
 	if not is_starting_domino and domino.top_value == domino.bottom_value:
 		has_extra_turn = true
@@ -542,38 +556,39 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 		tween.tween_property(domino, "scale", Vector3(1, 1, 1), 0.2)
 		if has_node("DoubleSound"):
 			$DoubleSound.play()
-
+	
 	# Handle selection cleanup
 	if domino == selected_domino:
 		domino.deselect()
 		selected_domino = null
 		hide_valid_moves()
-
+	
 	# Refill hand if needed
 	if not is_starting_domino and current_turn == "player":
 		refill_hand()
 		reposition_hand()
-
+	
 	# Check for track completion
 	if track.pieces.size() == TRACK_LENGTH:
 		var first = track.pieces.front()
 		var last = track.pieces.back()
 		var first_value = first.top_value if first.display_top else first.bottom_value
 		var last_value = last.bottom_value if last.display_top else last.top_value
-
+		
 		if first_value == last_value:
 			clear_and_restart_track(track_idx)
-
+	
 	# Only count regular dominos placed by player (not starting dominos or AI)
 	if not is_starting_domino and current_turn == "player" and not is_discard_mode:
 		regular_dominos_played += 1
-
+		
 	# Check if 3 regular dominos played, then add a power domino if possible
 	if regular_dominos_played >= 3 and power_hand.size() < MAX_POWER_DOMINOS:
 		regular_dominos_played = 0  # Reset counter
 		add_power_domino()
-
+	
 	return true
+
 
 
 
@@ -814,7 +829,7 @@ func get_or_create_indicator(track: Dictionary) -> MeshInstance3D:
 ### INPUT HANDLING ============================================================
 
 
-func _input(event):
+func _input(event) -> void:
 	if current_turn != "player" or is_discard_mode:
 		return
 
@@ -833,13 +848,15 @@ func _input(event):
 			var result = get_world_3d().direct_space_state.intersect_ray(query)
 			
 			if result and result.collider is StaticBody3D:
-				for i in tracks.size():
+				for i in range(tracks.size()):
 					if tracks[i]["static_body"] == result.collider and can_place_on_track(selected_domino, i):
-						var success = try_place_domino(selected_domino, i)  # sync call
+						var success = await try_place_domino(selected_domino, i)
 						if success:
 							selected_domino = null
 							hide_valid_moves()
 							end_player_turn()
+						break
+
 
 
 
