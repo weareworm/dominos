@@ -494,16 +494,18 @@ func can_place_on_track(domino: Domino, track_idx: int) -> bool:
 
 
 func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool = false) -> bool:
+	# Basic validation
 	if not is_instance_valid(domino):
 		return false
-	
+
 	var track = tracks[track_idx]
 	var pos_idx = track.pieces.size()
-	
+
+	# Out of positions
 	if pos_idx >= track.positions.size():
 		return false
-	
-	# Check if domino matches the track rules (skip check if power domino)
+
+	# Value matching (skip for power dominos)
 	if pos_idx > 0 and not domino.is_power_domino:
 		var last = track.pieces.back()
 		var must_match = last.bottom_value if last.display_top else last.top_value
@@ -516,39 +518,70 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 			return false
 
 		domino.update_dots()
-	
-	# Place the domino physically
+	else:
+		# For power dominos or placing as first piece, still update visuals if needed
+		domino.update_dots()
+
+	# Place the domino visually at the target marker
 	domino.freeze = false
 	if domino.get_parent() != self:
 		add_child(domino)
-	
+
 	domino.global_transform = track.positions[pos_idx].global_transform
 	domino.global_position.y += 0.2
-	
+
+	# Wait one physics frame so the physics/transform settles (original behavior)
 	await get_tree().physics_frame
 	domino.freeze = true
-	
-	# Add to track
+
+	# Add to track array
 	track.pieces.append(domino)
+
+	# Remove from the correct hand (unless it's a starting domino)
 	if not is_starting_domino:
-		player_hand.erase(domino)
-	
+		if domino.is_power_domino:
+			# power dominos come from power_hand
+			if domino in power_hand:
+				power_hand.erase(domino)
+		else:
+			if domino in player_hand:
+				player_hand.erase(domino)
+
+	# If this was a power domino: bomb effect (remove previous last), then spend the power domino
 	if domino.is_power_domino:
-		# Remove last domino on the track before power domino
+		# 1) remove the domino that was previously last (if exists)
 		if track.pieces.size() > 1:
-			var last_domino_index = track.pieces.size() - 2
-			var last_domino = track.pieces[last_domino_index]
-			if is_instance_valid(last_domino):
-				track.pieces.remove_at(last_domino_index)
-				last_domino.queue_free()
-		
-		# Remove the power domino itself as it is spent
-		track.pieces.remove_at(track.pieces.size() - 1)
-		domino.queue_free()
-		# No refill or further processing for the spent power domino
+			var prev_last_index = track.pieces.size() - 2
+			var prev_last = track.pieces[prev_last_index]
+			# Remove it from the pieces array first
+			track.pieces.remove_at(prev_last_index)
+			# Free the node if valid
+			if is_instance_valid(prev_last):
+				prev_last.queue_free()
+
+		# 2) remove the power domino itself from the track and free it
+		#    (it was appended at the end of track.pieces)
+		var power_index = track.pieces.size() - 1
+		# clear selection if it was selected to avoid dangling references
+		if domino == selected_domino:
+			selected_domino = null
+		track.pieces.remove_at(power_index)
+		if is_instance_valid(domino):
+			domino.queue_free()
+
+		# 3) player keeps the turn after using a power domino
+		has_extra_turn = true
+
+		# 4) update power hand visuals/positions
+		reposition_power_hand()
+
+		# Done — no refill, no double-checks for power domino
+		hide_valid_moves()
 		return true
-	
-	# Check for double domino
+
+	# Regular domino logic continues from here ------------------------------
+
+	# Double domino handling (only for regular dominos)
 	if not is_starting_domino and domino.top_value == domino.bottom_value:
 		has_extra_turn = true
 		var tween = create_tween()
@@ -556,38 +589,38 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 		tween.tween_property(domino, "scale", Vector3(1, 1, 1), 0.2)
 		if has_node("DoubleSound"):
 			$DoubleSound.play()
-	
-	# Handle selection cleanup
+
+	# Selection cleanup
 	if domino == selected_domino:
 		domino.deselect()
 		selected_domino = null
 		hide_valid_moves()
-	
-	# Refill hand if needed
+
+	# Refill player's regular hand if needed (only for regular dominos)
 	if not is_starting_domino and current_turn == "player":
 		refill_hand()
 		reposition_hand()
-	
-	# Check for track completion
+
+	# Check for track completion (only relevant for regular dominos)
 	if track.pieces.size() == TRACK_LENGTH:
 		var first = track.pieces.front()
 		var last = track.pieces.back()
 		var first_value = first.top_value if first.display_top else first.bottom_value
 		var last_value = last.bottom_value if last.display_top else last.top_value
-		
+
 		if first_value == last_value:
 			clear_and_restart_track(track_idx)
-	
-	# Only count regular dominos placed by player (not starting dominos or AI)
+
+	# Count regular domino plays for awarding power dominos (player only)
 	if not is_starting_domino and current_turn == "player" and not is_discard_mode:
 		regular_dominos_played += 1
-		
-	# Check if 3 regular dominos played, then add a power domino if possible
-	if regular_dominos_played >= 3 and power_hand.size() < MAX_POWER_DOMINOS:
-		regular_dominos_played = 0  # Reset counter
-		add_power_domino()
-	
+		if regular_dominos_played >= 3 and power_hand.size() < MAX_POWER_DOMINOS:
+			regular_dominos_played = 0
+			add_power_domino()
+
 	return true
+
+
 
 
 
