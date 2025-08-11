@@ -128,7 +128,7 @@ func spawn_starting_dominos():
 			domino.is_in_hand = false
 			domino.place_on_board()
 			add_child(domino)
-			await try_place_domino(domino, i, true)
+			try_place_domino(domino, i, true)
 
 func draw_initial_hands():
 	player_hand.clear()
@@ -193,11 +193,12 @@ func reposition_hand():
 		player_hand[i].position = hand_center + Vector3((i - player_hand.size() * 0.5) * HAND_SPACING, 0, 0)
 
 func player_has_valid_moves() -> bool:
-	for domino in player_hand:
+	for domino in player_hand + power_hand:
 		for track_idx in tracks.size():
 			if can_place_on_track(domino, track_idx):
 				return true
 	return false
+
 
 ### TURN MANAGEMENT ===========================================================
 func update_turn_indicator():
@@ -231,44 +232,52 @@ func update_turn_indicator():
 			pass_button.disabled = false
 			pass_button.modulate = Color.WHITE
 
-func end_player_turn():
+
+func end_player_turn() -> void:
 	if is_discard_mode:
 		return
-		
+
 	if has_extra_turn:
 		has_extra_turn = false
 		return
-		
+
 	current_turn = "ai"
 	update_turn_indicator()
 	await get_tree().create_timer(0.5).timeout
-	start_ai_turn()
+	await start_ai_turn()  # <-- IMPORTANT: await this to run AI turn
 
-func end_ai_turn():
-	current_turn = "player"
-	update_turn_indicator()
 
-### AI LOGIC ==================================================================
-func start_ai_turn():
+
+
+
+func start_ai_turn() -> void:
 	print("AI's turn starting - Current hand size: ", ai_hand.size())
 	has_extra_turn = false
-	
+
 	var double_move = find_ai_double_move()
 	if double_move:
 		await ai_play_domino(double_move.values, double_move.track)
 		if has_extra_turn:
 			has_extra_turn = false
 			await get_tree().create_timer(0.5).timeout
-			start_ai_turn()
+			await start_ai_turn()  # await recursive call
 			return
-	
+
 	var valid_moves = find_ai_valid_moves()
 	if valid_moves.size() > 0:
 		await ai_play_domino(valid_moves[0].values, valid_moves[0].track)
 	else:
 		await ai_discard_domino()
-	
+
 	end_ai_turn()
+
+
+
+func end_ai_turn() -> void:
+	current_turn = "player"
+	update_turn_indicator()
+
+
 
 func find_ai_double_move() -> Dictionary:
 	for domino_values in ai_hand:
@@ -287,16 +296,58 @@ func find_ai_double_move() -> Dictionary:
 
 func find_ai_valid_moves() -> Array:
 	var valid_moves = []
+	print("Finding AI valid moves. AI hand size: ", ai_hand.size())
+	
 	for domino_values in ai_hand:
-		var domino = domino_factory.create_specific_domino(domino_values[0], domino_values[1])
-		for track_idx in tracks.size():
-			if can_place_on_track(domino, track_idx):
+		var top_val = domino_values[0]
+		var bottom_val = domino_values[1]
+		print("Checking domino: ", top_val, "-", bottom_val)
+		
+		# Create a temporary Domino-like dict to check power status and values
+		var temp_domino = {
+			"is_power_domino": false,  # AI power dominos may require special handling if you have them
+			"top_value": top_val,
+			"bottom_value": bottom_val
+		}
+		
+		for track_idx in range(tracks.size()):
+			if can_place_on_track_ai(temp_domino, track_idx):
+				print("Valid move on track ", track_idx)
 				valid_moves.append({
-					"values": domino_values,
-					"track": track_idx
+					"values": [top_val, bottom_val],
+					"track": track_idx,
+					"domino_values": domino_values
 				})
-		domino.queue_free()
+	
+	print("AI valid moves found: ", valid_moves.size())
 	return valid_moves
+
+func can_place_on_track_ai(domino_data, track_idx: int) -> bool:
+	var track = tracks[track_idx]
+
+	if track.pieces.size() >= TRACK_LENGTH:
+		return false
+
+	if domino_data.has("is_power_domino") and domino_data.is_power_domino:
+		return true  # Power dominos can go anywhere
+
+	if track.pieces.is_empty():
+		return true
+
+	var last = track.pieces.back()
+	var visible_end = last.bottom_value if last.display_top else last.top_value
+
+	if domino_data.top_value == visible_end or domino_data.bottom_value == visible_end:
+		if track.pieces.size() == TRACK_LENGTH - 1:
+			var first = track.pieces.front()
+			var first_value = first.top_value if first.display_top else first.bottom_value
+			var domino_other_value = domino_data.bottom_value if domino_data.top_value == visible_end else domino_data.top_value
+			return domino_other_value == first_value
+		return true
+
+	return false
+
+
 
 func ai_play_domino(domino_values: Array, track_idx: int):
 	print("AI playing ", domino_values[0], "-", domino_values[1], " on track ", track_idx+1)
@@ -417,68 +468,72 @@ func ai_discard_domino():
 ### GAMEPLAY LOGIC ============================================================
 func can_place_on_track(domino: Domino, track_idx: int) -> bool:
 	var track = tracks[track_idx]
-	
+
 	if track.pieces.size() >= TRACK_LENGTH:
 		return false
-		
+
+	if domino.is_power_domino:
+		return true  # Power dominos can be placed anywhere
+
 	if track.pieces.is_empty():
 		return true
-		
+
 	var last = track.pieces.back()
 	var visible_end = last.bottom_value if last.display_top else last.top_value
-	
-	# Check if domino matches the end
+
 	if domino.top_value == visible_end or domino.bottom_value == visible_end:
 		if track.pieces.size() == TRACK_LENGTH - 1:
-			# For last position, check if it completes the loop
 			var first = track.pieces.front()
 			var first_value = first.top_value if first.display_top else first.bottom_value
 			var domino_other_value = domino.bottom_value if domino.top_value == visible_end else domino.top_value
 			return domino_other_value == first_value
 		return true
-		
+
 	return false
+
+
 
 func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool = false) -> bool:
 	if not is_instance_valid(domino):
 		return false
-		
+
 	var track = tracks[track_idx]
 	var pos_idx = track.pieces.size()
-	
+
 	if pos_idx >= track.positions.size():
 		return false
-	
+
 	# Check if domino matches the track rules
-	if pos_idx > 0:
+	if pos_idx > 0 and not domino.is_power_domino:
 		var last = track.pieces.back()
 		var must_match = last.bottom_value if last.display_top else last.top_value
-		
+
 		if domino.top_value == must_match:
 			domino.display_top = true
 		elif domino.bottom_value == must_match:
 			domino.display_top = false
 		else:
 			return false
-			
+
 		domino.update_dots()
-	
+
 	# Place the domino physically
 	domino.freeze = false
 	if domino.get_parent() != self:
 		add_child(domino)
-	
+
 	domino.global_transform = track.positions[pos_idx].global_transform
 	domino.global_position.y += 0.2
-	
-	await get_tree().physics_frame
+
+	# Removed await here — just proceed immediately
+
 	domino.freeze = true
-	
+
 	# Add to track
 	track.pieces.append(domino)
 	if not is_starting_domino:
 		player_hand.erase(domino)
-	
+
 	# Check for double domino
 	if not is_starting_domino and domino.top_value == domino.bottom_value:
 		has_extra_turn = true
@@ -487,58 +542,59 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 		tween.tween_property(domino, "scale", Vector3(1, 1, 1), 0.2)
 		if has_node("DoubleSound"):
 			$DoubleSound.play()
-	
+
 	# Handle selection cleanup
 	if domino == selected_domino:
 		domino.deselect()
 		selected_domino = null
 		hide_valid_moves()
-	
+
 	# Refill hand if needed
 	if not is_starting_domino and current_turn == "player":
 		refill_hand()
 		reposition_hand()
-	
+
 	# Check for track completion
 	if track.pieces.size() == TRACK_LENGTH:
 		var first = track.pieces.front()
 		var last = track.pieces.back()
 		var first_value = first.top_value if first.display_top else first.bottom_value
 		var last_value = last.bottom_value if last.display_top else last.top_value
-		
+
 		if first_value == last_value:
 			clear_and_restart_track(track_idx)
-	
+
 	# Only count regular dominos placed by player (not starting dominos or AI)
 	if not is_starting_domino and current_turn == "player" and not is_discard_mode:
 		regular_dominos_played += 1
-		
+
 	# Check if 3 regular dominos played, then add a power domino if possible
 	if regular_dominos_played >= 3 and power_hand.size() < MAX_POWER_DOMINOS:
 		regular_dominos_played = 0  # Reset counter
 		add_power_domino()
-	
+
 	return true
+
+
+
+
 
 
 func add_power_domino():
 	print("Adding a power domino now!")
-	if power_hand.size() >= 3:
+	if power_hand.size() >= MAX_POWER_DOMINOS:
 		print("Power hand full, not adding.")
 		return
-	
+
 	print("Power domino awarded!")
 	var power_domino = domino_factory.create_random_domino()
 	power_domino.is_power_domino = true
-	
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 0, 0)  # red
-	power_domino.get_node("MeshInstance3D").set_surface_override_material(0, mat)
-	
-	power_domino.set_highlight(true, Color.RED)
+	power_domino.set_highlight(true, Color(1, 0, 0))  # Red highlight
 	power_hand.append(power_domino)
 	add_child(power_domino)
+	safe_connect_domino_signals(power_domino)  # Connect signals here!
 	reposition_power_hand()
+
 
 
 
@@ -583,7 +639,7 @@ func clear_and_restart_track(track_idx: int):
 			new_domino.is_in_hand = false
 			new_domino.place_on_board()
 			add_child(new_domino)
-			await try_place_domino(new_domino, track_idx, true)
+			try_place_domino(new_domino, track_idx, true)
 
 ### DISCARD SYSTEM ============================================================
 func enable_discard_mode():
@@ -756,32 +812,36 @@ func get_or_create_indicator(track: Dictionary) -> MeshInstance3D:
 	return track.node.get_node("Indicator")
 
 ### INPUT HANDLING ============================================================
+
+
 func _input(event):
 	if current_turn != "player" or is_discard_mode:
 		return
-		
+
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		if is_discard_mode:
 			disable_discard_mode()
 			return
-		
+
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if selected_domino:
 			var camera = get_viewport().get_camera_3d()
-			var result = get_world_3d().direct_space_state.intersect_ray(
-				PhysicsRayQueryParameters3D.create(
-					camera.project_ray_origin(event.position),
-					camera.project_ray_normal(event.position) * 100
-				)
-			)
+			var from = camera.project_ray_origin(event.position)
+			var to = from + camera.project_ray_normal(event.position) * 100
+			
+			var query = PhysicsRayQueryParameters3D.create(from, to)
+			var result = get_world_3d().direct_space_state.intersect_ray(query)
 			
 			if result and result.collider is StaticBody3D:
 				for i in tracks.size():
 					if tracks[i]["static_body"] == result.collider and can_place_on_track(selected_domino, i):
-						if await try_place_domino(selected_domino, i):
+						var success = try_place_domino(selected_domino, i)  # sync call
+						if success:
 							selected_domino = null
 							hide_valid_moves()
 							end_player_turn()
+
+
 
 func _on_domino_selected(domino: Domino):
 	if current_turn != "player" or is_processing_selection:
@@ -819,6 +879,7 @@ func _on_domino_selected(domino: Domino):
 			show_valid_moves(domino)
 	
 	is_processing_selection = false
+
 
 func _on_domino_deselected():
 	if selected_domino:
