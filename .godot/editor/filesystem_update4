@@ -9,3 +9,4 @@ res://scripts/domino_factory.gd
 res://scripts/board.gd
 res://scripts/domino.gd
 res://scripts/domino_dots.gd
+res://scripts/score_display.gd

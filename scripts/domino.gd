@@ -61,6 +61,8 @@ var is_flipped := false:
 		update_dots()
 var display_top := true
 
+var is_power_domino: bool = false
+
 ### READY FUNCTION ###
 func _ready():
 	_ensure_highlight_components()
@@ -71,7 +73,7 @@ func _ready():
 	_setup_domino_visuals()
 	update_dots()
 	
-	if debug_visible:
+	if debug_visible and not is_power_domino:
 		_setup_debug_labels()
 	
 	input_ray_pickable = true
@@ -107,9 +109,17 @@ func set_highlight(enable: bool, color: Color = Color(1, 0.8, 0.2, 0.6)):
 	if not is_instance_valid(highlight_mesh) or not is_instance_valid(highlight_material):
 		push_error("Highlight components not initialized")
 		return
-	
+
+	if enable:
+		if is_power_domino:
+			highlight_material.albedo_color = Color(1, 0, 0, 0.8)  # semi-transparent red
+		else:
+			highlight_material.albedo_color = color
+	else:
+		highlight_mesh.visible = false
+		return
+
 	highlight_mesh.visible = enable
-	highlight_material.albedo_color = color
 
 ### SETUP FUNCTIONS ###
 func _setup_physics():
@@ -140,7 +150,11 @@ func _setup_domino_visuals():
 			dot.position = Vector3(pos.x, pos.y, DOT_Z_OFFSET)
 			_setup_dot_appearance(dot)
 
+### DEBUG LABELS ###
 func _setup_debug_labels():
+	if is_power_domino:
+		return  # No debug labels for power dominos
+	
 	top_label = Label3D.new()
 	top_label.text = str(top_value)
 	top_label.font_size = 16
@@ -165,6 +179,13 @@ func _update_bottom_dots():
 		_update_dots_for_value($BottomDots, top_value if display_top else bottom_value)
 
 func update_dots():
+	if is_power_domino:
+		if has_node("TopDots"):
+			$TopDots.visible = false
+		if has_node("BottomDots"):
+			$BottomDots.visible = false
+		return
+	
 	_update_top_dots()
 	_update_bottom_dots()
 

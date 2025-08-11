@@ -31,6 +31,12 @@ var is_discard_mode := false
 var is_game_over := false
 var has_extra_turn := false
 
+# New variables for power dominos
+var power_hand := []  # Array to hold power dominos
+var regular_dominos_played := 0  # Counter for how many regular dominos have been played
+const MAX_POWER_DOMINOS := 3  # Max power dominos player can hold
+
+
 func _ready():
 	initialize_game()
 	setup_viewport()
@@ -502,7 +508,46 @@ func try_place_domino(domino: Domino, track_idx: int, is_starting_domino: bool =
 		
 		if first_value == last_value:
 			clear_and_restart_track(track_idx)
+	
+	# Only count regular dominos placed by player (not starting dominos or AI)
+	if not is_starting_domino and current_turn == "player" and not is_discard_mode:
+		regular_dominos_played += 1
+		
+	# Check if 3 regular dominos played, then add a power domino if possible
+	if regular_dominos_played >= 3 and power_hand.size() < MAX_POWER_DOMINOS:
+		regular_dominos_played = 0  # Reset counter
+		add_power_domino()
+	
 	return true
+
+
+func add_power_domino():
+	print("Adding a power domino now!")
+	if power_hand.size() >= 3:
+		print("Power hand full, not adding.")
+		return
+	
+	print("Power domino awarded!")
+	var power_domino = domino_factory.create_random_domino()
+	power_domino.is_power_domino = true
+	
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(1, 0, 0)  # red
+	power_domino.get_node("MeshInstance3D").set_surface_override_material(0, mat)
+	
+	power_domino.set_highlight(true, Color.RED)
+	power_hand.append(power_domino)
+	add_child(power_domino)
+	reposition_power_hand()
+
+
+
+
+func reposition_power_hand():
+	var power_hand_center = Vector3(0, 0.2, 2.0)  # In front of regular hand along Z-axis
+	for i in power_hand.size():
+		power_hand[i].position = power_hand_center + Vector3((i - power_hand.size() * 0.5) * HAND_SPACING, 0, 0)
+
 
 func clear_and_restart_track(track_idx: int):
 	var track = tracks[track_idx]
