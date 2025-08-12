@@ -10,3 +10,4 @@ res://scripts/board.gd
 res://scripts/domino.gd
 res://scripts/domino_dots.gd
 res://scripts/score_display.gd
+res://scenes/debug_camera.gd
